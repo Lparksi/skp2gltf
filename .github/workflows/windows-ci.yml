@@ -25,22 +25,54 @@ jobs:
       - name: Build (Release)
         run: cmake --build build --config Release --parallel
 
+      - name: Package artifacts (zip/7z)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $releaseDir = "build/Release"
+          $distDir = "build/dist"
+          New-Item -ItemType Directory -Force -Path $distDir | Out-Null
+
+          $files = @(
+            "$releaseDir/skp2gltf.exe",
+            "$releaseDir/SketchUpAPI.dll",
+            "$releaseDir/SketchUpCommonPreferences.dll"
+          )
+
+          foreach ($file in $files) {
+            if (-not (Test-Path $file)) {
+              throw "Missing build output: $file"
+            }
+          }
+
+          $zipPath = "$distDir/skp2gltf-windows-release.zip"
+          Compress-Archive -Path $files -DestinationPath $zipPath -CompressionLevel Optimal -Force
+
+          if (Get-Command 7z -ErrorAction SilentlyContinue) {
+            $sevenZipPath = "$distDir/skp2gltf-windows-release.7z"
+            & 7z a -t7z $sevenZipPath $files
+            if ($LASTEXITCODE -ne 0) {
+              throw "7z compression failed with exit code $LASTEXITCODE"
+            }
+          } else {
+            Write-Host "7z command not found. Skipping .7z package and keeping .zip only."
+          }
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: skp2gltf-windows-release
+          name: skp2gltf-windows-release-archive
           if-no-files-found: warn
           path: |
-            build/Release/skp2gltf.exe
-            build/Release/SketchUpAPI.dll
-            build/Release/SketchUpCommonPreferences.dll
+            build/dist/*.zip
+            build/dist/*.7z
 
       - name: Create GitHub Release (tag push only)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          fail_on_unmatched_files: false
           files: |
-            build/Release/skp2gltf.exe
-            build/Release/SketchUpAPI.dll
-            build/Release/SketchUpCommonPreferences.dll
+            build/dist/*.zip
+            build/dist/*.7z
