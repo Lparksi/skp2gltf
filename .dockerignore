@@ -1,0 +1,7 @@
+**
+!.dockerignore
+!Dockerfile
+!Dockerfile.alpine
+!entrypoint.sh
+!docker-bin/
+!docker-bin/*
