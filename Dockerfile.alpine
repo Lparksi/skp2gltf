@@ -3,6 +3,7 @@ FROM alpine:3.20
 ENV DISPLAY=:99 \
     WINEARCH=win64 \
     WINEDEBUG=-all \
+    WINEDLLOVERRIDES=mscoree,mshtml= \
     WINEPREFIX=/root/.wine
 
 RUN apk add --no-cache \

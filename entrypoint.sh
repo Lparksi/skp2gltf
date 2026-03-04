@@ -10,6 +10,11 @@ else
     exit 127
 fi
 
+# Disable Wine Mono/Gecko GUI installers in headless environments.
+# This prevents first-run hangs where only the wine prefix line is shown.
+: "${WINEDLLOVERRIDES:=mscoree,mshtml=}"
+export WINEDLLOVERRIDES
+
 Xvfb "${DISPLAY:-:99}" -screen 0 1024x768x24 >/dev/null 2>&1 &
 XVFB_PID="$!"
 

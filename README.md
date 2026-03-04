@@ -84,13 +84,37 @@ skp2gltf.exe "C:\models\model.skp" "C:\models\output" "result"
 - 输出文件夹必须已存在
 - 程序会根据设置自动选择输出 .gltf 或 .glb 格式
 
+## Docker 使用
+
+项目已发布到 GitHub Container Registry：
+
+- Alpine 镜像（体积更小）：https://github.com/Lparksi/skp2gltf/pkgs/container/skp2gltf-alpine
+- 标准镜像（Debian）：https://github.com/users/Lparksi/packages/container/package/skp2gltf
+
+拉取镜像：
+```bash
+docker pull ghcr.io/lparksi/skp2gltf:latest
+docker pull ghcr.io/lparksi/skp2gltf-alpine:latest
+```
+
+运行示例（容器参数与命令行一致）：
+```bash
+docker run --rm -e WINEDLLOVERRIDES="mscoree,mshtml=" -v "${PWD}:/work" ghcr.io/lparksi/skp2gltf-alpine:latest /work/model.skp /work/output result
+```
+
+说明：
+- 容器会将参数透传给 `skp2gltf.exe <input.skp> <output_dir> <output_name>`
+- 输入文件和输出目录都需要位于挂载目录中（示例里是 `/work`）
+- 如果首次运行只看到 `wine: created the configuration directory '/root/.wine'`，通常是 Wine 初始化阶段；建议保留上面的 `WINEDLLOVERRIDES` 环境变量避免卡住
+
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request！
-如需进一步沟通，请通过以下邮箱联系我们：  
-**Email:** dlutyaol@qq.com
 
-![QR Code](./static/contact.jpg)
+### Lparksi
+
+- 优化文档结构，保留核心功能、构建与使用说明
+- 持续维护文档可读性与项目信息准确性
 
 ## 许可证
 

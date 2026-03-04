@@ -4,6 +4,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     DISPLAY=:99 \
     WINEARCH=win64 \
     WINEDEBUG=-all \
+    WINEDLLOVERRIDES=mscoree,mshtml= \
     WINEPREFIX=/root/.wine
 
 RUN apt-get update && \

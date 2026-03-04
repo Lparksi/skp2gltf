@@ -5,15 +5,15 @@
 
 # SKP2GLTF
 
-A tool for converting SketchUp (.skp) files to glTF/GLB format. Supports Draco mesh compression, which can significantly reduce the output file size.
+A tool for converting SketchUp (.skp) files to glTF/GLB format. It supports Draco mesh compression, which can significantly reduce output file size.
 
 ## Features
 
-- Support for converting SketchUp (.skp) files to glTF/GLB format
-- Integrated Draco compression algorithm for effective file size reduction
-- Support for materials, textures, and geometry data conversion
-- Support for custom compression parameter configuration
-- Support for batch file processing
+- Convert SketchUp (.skp) files to glTF/GLB format
+- Integrate Draco compression to reduce output size effectively
+- Convert materials, textures, and geometry data
+- Support custom compression parameter configuration
+- Support batch processing
 
 ## Screenshots
 
@@ -25,29 +25,29 @@ A tool for converting SketchUp (.skp) files to glTF/GLB format. Supports Draco m
 
 ## System Requirements
 
-- Operating System: Windows and Windows Server platforms only
+- Operating system: Windows and Windows Server only
   - Windows 10/11 64-bit
   - Windows Server 2016/2019/2022
-- Other Requirements:
+- Other requirements:
   - Visual Studio 2019 or higher (for compilation)
-  - SketchUp 2019 or higher (for runtime environment)
+  - SketchUp 2019 or higher (for runtime)
 
 ## Dependencies
 
 - SketchUp SDK (2019+)
-- Draco Compression Library
+- Draco compression library
 - TinyGLTF
-- CMake (Build System)
+- CMake (build system)
 
 ## Build Instructions
 
-1. Ensure CMake and a supported C++ compiler are installed
+1. Ensure CMake and a supported C++ compiler are installed.
 2. Clone the repository:
    ```bash
    git clone <repository-url>
    cd skp2gltf
    ```
-3. Create a build directory:
+3. Create the build directory:
    ```bash
    mkdir build && cd build
    ```
@@ -61,7 +61,7 @@ A tool for converting SketchUp (.skp) files to glTF/GLB format. Supports Draco m
 
 ### Basic Usage
 
-After compilation, the executable `skp2gltf.exe` is located in the `build/Debug` or `build/Release` directory (depending on the build configuration).
+After building, the executable `skp2gltf.exe` is located in `build/Debug` or `build/Release` (depending on your build configuration).
 
 Command line format:
 ```bash
@@ -75,22 +75,46 @@ Parameter description:
 
 Example usage:
 ```bash
-# Convert model.skp to GLTF file, output to the output folder with filename result
+# Convert model.skp to a GLTF file, write to output folder, and name it result
 skp2gltf.exe "C:\models\model.skp" "C:\models\output" "result"
 ```
 
 Note:
-- Paths containing spaces must be enclosed in quotes
-- The output directory must exist
-- The program will automatically choose between .gltf or .glb format based on settings
+- Paths containing spaces must be wrapped in quotes
+- The output directory must already exist
+- The program will choose `.gltf` or `.glb` automatically based on settings
+
+## Docker Usage
+
+The project is published on GitHub Container Registry:
+
+- Alpine image (smaller size): https://github.com/Lparksi/skp2gltf/pkgs/container/skp2gltf-alpine
+- Standard image (Debian): https://github.com/users/Lparksi/packages/container/package/skp2gltf
+
+Pull images:
+```bash
+docker pull ghcr.io/lparksi/skp2gltf:latest
+docker pull ghcr.io/lparksi/skp2gltf-alpine:latest
+```
+
+Run example (container arguments are the same as CLI):
+```bash
+docker run --rm -e WINEDLLOVERRIDES="mscoree,mshtml=" -v "${PWD}:/work" ghcr.io/lparksi/skp2gltf-alpine:latest /work/model.skp /work/output result
+```
+
+Notes:
+- The container forwards arguments to `skp2gltf.exe <input.skp> <output_dir> <output_name>`
+- Input file and output directory must both be inside the mounted directory (in this example, `/work`)
+- If the first run only prints `wine: created the configuration directory '/root/.wine'`, it is usually stuck in Wine initialization. Keep the `WINEDLLOVERRIDES` environment variable shown above to avoid this hang.
 
 ## Contributing
 
 Issues and Pull Requests are welcome!
-For further communication, please contact us via email:  
-**Email:** dlutyaol@qq.com
 
-![QR Code](./static/contact.jpg)
+### Lparksi
+
+- Refined documentation structure and kept core sections for features, build, and usage
+- Continuously maintains documentation readability and project information accuracy
 
 ## License
 
