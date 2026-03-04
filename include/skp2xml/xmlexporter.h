@@ -108,7 +108,11 @@ class CXmlExporter
     virtual ~CXmlExporter();
 
     // Convert
-    bool Convert(const std::string &from_file, const std::string &file_name, const std::string &to_file, SketchUpPluginProgressCallback *callback);
+    bool Convert(const std::string &from_file,
+                 const std::string &file_name,
+                 const std::string &to_file,
+                 const std::string &output_format,
+                 SketchUpPluginProgressCallback *callback);
 
     // Set user options
     void SetOptions(const CXmlOptions &options) { options_ = options; }
@@ -116,7 +120,7 @@ class CXmlExporter
     // Get stats
     const CXmlExportStats &stats() const { return stats_; }
 
-    int exportToGltfImpl(const std::string &gltfName);
+    int exportToGltfImpl(const std::string &gltfName, const std::string &outputFormat);
     void addFace(SUEntitiesRef entities, const SUTransformation &transformation);
     void getComponentEntity(SUEntitiesRef entities, const SUTransformation &transformation);
 

@@ -65,24 +65,28 @@
 
 命令行格式：
 ```bash
-skp2gltf.exe <input.skp> <output_dir> <output_name>
+skp2gltf.exe <input.skp> <output_dir> <output_name> [output_format]
 ```
 
 参数说明：
 - `<input.skp>`: 输入的 SketchUp 文件路径
 - `<output_dir>`: 输出文件夹路径
 - `<output_name>`: 输出文件名（不需要包含扩展名）
+- `[output_format]`: 可选，输出格式，支持 `glb` 或 `gltf`，默认 `glb`
 
 使用示例：
 ```bash
-# 将 model.skp 转换为 GLTF 文件，输出到 output 文件夹，文件名为 result
+# 默认导出 GLB（result.glb）
 skp2gltf.exe "C:\models\model.skp" "C:\models\output" "result"
+
+# 显式导出 GLTF（result.gltf）
+skp2gltf.exe "C:\models\model.skp" "C:\models\output" "result" gltf
 ```
 
 注意：
 - 如果路径中包含空格，需要用引号括起来
 - 输出文件夹必须已存在
-- 程序会根据设置自动选择输出 .gltf 或 .glb 格式
+- 如果不指定 `output_format`，默认输出 `.glb`
 
 ## Docker 使用
 
@@ -103,7 +107,7 @@ docker run --rm -e WINEDLLOVERRIDES="mscoree,mshtml=" -v "${PWD}:/work" ghcr.io/
 ```
 
 说明：
-- 容器会将参数透传给 `skp2gltf.exe <input.skp> <output_dir> <output_name>`
+- 容器会将参数透传给 `skp2gltf.exe <input.skp> <output_dir> <output_name> [output_format]`
 - 输入文件和输出目录都需要位于挂载目录中（示例里是 `/work`）
 - 如果首次运行只看到 `wine: created the configuration directory '/root/.wine'`，通常是 Wine 初始化阶段；建议保留上面的 `WINEDLLOVERRIDES` 环境变量避免卡住
 

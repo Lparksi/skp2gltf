@@ -11,6 +11,8 @@
 #include <sstream>
 #include <vector>
 #include <cassert>
+#include <algorithm>
+#include <cctype>
 #include <stdint.h>  // For int32_t type
 #include <cstdint>  // 添加这一行
 
@@ -87,6 +89,61 @@ static std::string GetLayerName(SULayerRef layer)
     return name.utf8();
 }
 
+static std::string ToLowerCopy(std::string value)
+{
+    std::transform(
+        value.begin(), value.end(), value.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return value;
+}
+
+static bool EndsWithIgnoreCase(const std::string &value, const std::string &suffix)
+{
+    if (value.size() < suffix.size())
+    {
+        return false;
+    }
+    const size_t offset = value.size() - suffix.size();
+    for (size_t i = 0; i < suffix.size(); ++i)
+    {
+        if (std::tolower(static_cast<unsigned char>(value[offset + i])) !=
+            std::tolower(static_cast<unsigned char>(suffix[i])))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+static std::string NormalizeOutputFormat(const std::string &output_format)
+{
+    const std::string normalized = ToLowerCopy(output_format);
+    if (normalized == "gltf")
+    {
+        return "gltf";
+    }
+    if (normalized == "glb")
+    {
+        return "glb";
+    }
+    return "glb";
+}
+
+static std::string BuildOutputPathByFormat(const std::string &base_path, const std::string &output_format)
+{
+    std::string output_path = base_path;
+    if (EndsWithIgnoreCase(output_path, ".gltf"))
+    {
+        output_path.resize(output_path.size() - 5);
+    }
+    else if (EndsWithIgnoreCase(output_path, ".glb"))
+    {
+        output_path.resize(output_path.size() - 4);
+    }
+    output_path += ".";
+    output_path += output_format;
+    return output_path;
+}
+
 
 CXmlExporter::CXmlExporter()
 {
@@ -117,6 +174,7 @@ void CXmlExporter::ReleaseModelObjects()
 bool CXmlExporter::Convert(const std::string &src_file,
                            const std::string &file_path,
                            const std::string &file_name,
+                           const std::string &output_format,
                            SketchUpPluginProgressCallback *progress_callback)
 {
     bool exported = false;
@@ -150,8 +208,7 @@ bool CXmlExporter::Convert(const std::string &src_file,
         // 在导出到GLTF之前压缩纹理
         CompressAndResizeTextures();
         
-        exportToGltfImpl(file_name);
-        exported = true;
+        exported = exportToGltfImpl(file_name, output_format) == 0;
     }
     catch (...)
     {
@@ -464,7 +521,7 @@ void CXmlExporter::getComponentEntity(SUEntitiesRef entities, const SUTransforma
     }
 }
 
-int CXmlExporter::exportToGltfImpl(const std::string &gltfName) {
+int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::string &outputFormat) {
     tinygltf::Model model;
     model.asset.version = "2.0";
     model.asset.generator = "zhuzhaoyun";
@@ -643,16 +700,15 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName) {
     }
     
     tinygltf::TinyGLTF gltf;
-    std::string outputPath = gltfName;
-    if (outputPath.length() < 5 || outputPath.substr(outputPath.length() - 5) != ".gltf") {
-        outputPath += ".gltf";
-    }
-    
+    const std::string normalizedFormat = NormalizeOutputFormat(outputFormat);
+    const std::string outputPath = BuildOutputPathByFormat(gltfName, normalizedFormat);
+    const bool writeBinary = normalizedFormat == "glb";
+
     bool ret = gltf.WriteGltfSceneToFile(&model, outputPath,
                                         true,  // embedImages
                                         true,  // embedBuffers
                                         true,  // prettyPrint
-                                        false); // writeBinary
+                                        writeBinary);
     
     return ret ? 0 : 1;
 }

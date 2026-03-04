@@ -14,9 +14,38 @@
 #include <vector>
 #include <cstdarg>
 #include <string>
+#include <algorithm>
+#include <cctype>
 #include "skp2xml/xmlexporter.h"
 #include "tinyxml2/tinyxml2.h"
 #include "skp2xml/xmlexporter.h"
+
+static std::string ToLowerCopy(std::string value)
+{
+    std::transform(
+        value.begin(), value.end(), value.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return value;
+}
+
+static bool EndsWithIgnoreCase(const std::string &value, const std::string &suffix)
+{
+    if (value.size() < suffix.size())
+    {
+        return false;
+    }
+
+    const size_t offset = value.size() - suffix.size();
+    for (size_t i = 0; i < suffix.size(); ++i)
+    {
+        if (std::tolower(static_cast<unsigned char>(value[offset + i])) !=
+            std::tolower(static_cast<unsigned char>(suffix[i])))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 double getRatio(SUModelUnits units)
 {
     switch (units)
@@ -39,13 +68,35 @@ int main(int argc, char **argv)
 {
     if (argc < 4)
     {
-        std::cerr << "Usage: skp2gltf.exe <input.skp> <output_dir> <output_name_or_path>" << std::endl;
+        std::cerr << "Usage: skp2gltf.exe <input.skp> <output_dir> <output_name_or_path> [output_format:gltf|glb]" << std::endl;
         return 2;
     }
 
     std::string skp_file   = argv[1];
     std::string output_dir = argv[2];
     std::string output_arg = argv[3];
+    std::string output_format = "glb";
+
+    if (argc >= 5)
+    {
+        output_format = ToLowerCopy(argv[4]);
+        if (output_format != "gltf" && output_format != "glb")
+        {
+            std::cerr << "Invalid output format: " << argv[4] << ". Supported formats: gltf, glb" << std::endl;
+            return 2;
+        }
+    }
+    else
+    {
+        if (EndsWithIgnoreCase(output_arg, ".gltf"))
+        {
+            output_format = "gltf";
+        }
+        else if (EndsWithIgnoreCase(output_arg, ".glb"))
+        {
+            output_format = "glb";
+        }
+    }
 
     const bool has_separator = output_arg.find('/') != std::string::npos || output_arg.find('\\') != std::string::npos;
     const bool is_absolute   = (!output_arg.empty() && (output_arg[0] == '/' || output_arg[0] == '\\'))
@@ -72,7 +123,7 @@ int main(int argc, char **argv)
     // C:\model\allRvtFile\skp\67beca5e7d1b0078ee8c7fee.skp 
     // C:\model\model\skp\67beca5e7d1b0078ee8c7fee\ 
     // C:\model\model\skp\67beca5e7d1b0078ee8c7fee
-    const bool ok = cXmlExporter.Convert(skp_file, output_dir, gltf_file, nullptr);
+    const bool ok = cXmlExporter.Convert(skp_file, output_dir, gltf_file, output_format, nullptr);
     if (ok)
     {
         std::cout << "finished" << std::endl;

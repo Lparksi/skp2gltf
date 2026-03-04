@@ -65,24 +65,28 @@ After building, the executable `skp2gltf.exe` is located in `build/Debug` or `bu
 
 Command line format:
 ```bash
-skp2gltf.exe <input.skp> <output_dir> <output_name>
+skp2gltf.exe <input.skp> <output_dir> <output_name> [output_format]
 ```
 
 Parameter description:
 - `<input.skp>`: Input SketchUp file path
 - `<output_dir>`: Output directory path
 - `<output_name>`: Output file name (extension not required)
+- `[output_format]`: Optional output format, supports `glb` or `gltf`, default is `glb`
 
 Example usage:
 ```bash
-# Convert model.skp to a GLTF file, write to output folder, and name it result
+# Export GLB by default (result.glb)
 skp2gltf.exe "C:\models\model.skp" "C:\models\output" "result"
+
+# Explicitly export GLTF (result.gltf)
+skp2gltf.exe "C:\models\model.skp" "C:\models\output" "result" gltf
 ```
 
 Note:
 - Paths containing spaces must be wrapped in quotes
 - The output directory must already exist
-- The program will choose `.gltf` or `.glb` automatically based on settings
+- If `output_format` is not provided, `.glb` is used by default
 
 ## Docker Usage
 
@@ -103,7 +107,7 @@ docker run --rm -e WINEDLLOVERRIDES="mscoree,mshtml=" -v "${PWD}:/work" ghcr.io/
 ```
 
 Notes:
-- The container forwards arguments to `skp2gltf.exe <input.skp> <output_dir> <output_name>`
+- The container forwards arguments to `skp2gltf.exe <input.skp> <output_dir> <output_name> [output_format]`
 - Input file and output directory must both be inside the mounted directory (in this example, `/work`)
 - If the first run only prints `wine: created the configuration directory '/root/.wine'`, it is usually stuck in Wine initialization. Keep the `WINEDLLOVERRIDES` environment variable shown above to avoid this hang.
 
