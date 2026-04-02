@@ -90,10 +90,7 @@ skp2gltf.exe "C:\models\model.skp" "C:\models\output" "result" gltf
 
 ## Docker 使用
 
-项目已发布到 GitHub Container Registry：
-
-- Alpine 镜像（体积更小）：https://github.com/Lparksi/skp2gltf/pkgs/container/skp2gltf-alpine
-- 标准镜像（Debian）：https://github.com/users/Lparksi/packages/container/package/skp2gltf
+项目已发布到 GitHub Container Registry：https://github.com/users/Lparksi/packages/container/package/skp2gltf
 
 ### 多架构支持
 
@@ -104,12 +101,11 @@ Docker 镜像支持以下架构：
 拉取镜像：
 ```bash
 docker pull ghcr.io/lparksi/skp2gltf:latest
-docker pull ghcr.io/lparksi/skp2gltf-alpine:latest
 ```
 
 运行示例（容器参数与命令行一致）：
 ```bash
-docker run --rm -e WINEDLLOVERRIDES="mscoree,mshtml=" -v "${PWD}:/work" ghcr.io/lparksi/skp2gltf-alpine:latest /work/model.skp /work/output result
+docker run --rm -e WINEDLLOVERRIDES="mscoree,mshtml=" -v "${PWD}:/work" ghcr.io/lparksi/skp2gltf:latest /work/model.skp /work/output result
 ```
 
 ### macOS (Apple Silicon) 使用说明

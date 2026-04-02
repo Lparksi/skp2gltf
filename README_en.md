@@ -90,10 +90,7 @@ Note:
 
 ## Docker Usage
 
-The project is published on GitHub Container Registry:
-
-- Alpine image (smaller size): https://github.com/Lparksi/skp2gltf/pkgs/container/skp2gltf-alpine
-- Standard image (Debian): https://github.com/users/Lparksi/packages/container/package/skp2gltf
+The project is published on GitHub Container Registry: https://github.com/users/Lparksi/packages/container/package/skp2gltf
 
 ### Multi-Architecture Support
 
@@ -104,12 +101,11 @@ Docker images support the following architectures:
 Pull images:
 ```bash
 docker pull ghcr.io/lparksi/skp2gltf:latest
-docker pull ghcr.io/lparksi/skp2gltf-alpine:latest
 ```
 
 Run example (container arguments are the same as CLI):
 ```bash
-docker run --rm -e WINEDLLOVERRIDES="mscoree,mshtml=" -v "${PWD}:/work" ghcr.io/lparksi/skp2gltf-alpine:latest /work/model.skp /work/output result
+docker run --rm -e WINEDLLOVERRIDES="mscoree,mshtml=" -v "${PWD}:/work" ghcr.io/lparksi/skp2gltf:latest /work/model.skp /work/output result
 ```
 
 ### macOS (Apple Silicon) Usage Notes

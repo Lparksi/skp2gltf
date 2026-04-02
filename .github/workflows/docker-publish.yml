@@ -46,14 +46,6 @@ jobs:
     name: Build and Push Images
     needs: build-windows-binary
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - dockerfile: Dockerfile
-            image_suffix: ""
-          - dockerfile: Dockerfile.alpine
-            image_suffix: "-alpine"
 
     steps:
       - name: Checkout
@@ -88,7 +80,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}${{ matrix.image_suffix }}
+          images: ghcr.io/${{ github.repository }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch
@@ -99,7 +91,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ${{ matrix.dockerfile }}
+          file: Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
