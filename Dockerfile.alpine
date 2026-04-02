@@ -12,7 +12,7 @@ RUN apk add --no-cache \
         ca-certificates \
         wine \
         xvfb \
-        qemu-x86_64-static
+        qemu-x86_64
 
 WORKDIR /app
 
