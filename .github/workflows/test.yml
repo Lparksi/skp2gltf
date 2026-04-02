@@ -20,10 +20,10 @@ jobs:
       - name: Build (Release)
         run: cmake --build build --config Release --parallel
 
-      - name: Download Test Model
+      - name: Prepare Test Model
         shell: pwsh
         run: |
-          Invoke-WebRequest -Uri "https://file.parksi.cc/Dining%2BChair_251002.skp" -OutFile "test_model.skp"
+          Copy-Item "test/test_model.skp" "test_model.skp"
 
       - name: Run Conversion Test
         shell: pwsh
@@ -82,8 +82,8 @@ jobs:
       - name: Build local Docker image
         run: docker build -t skp2gltf-test .
 
-      - name: Download Test Model
-        run: wget -O test_model.skp "https://file.parksi.cc/Dining%2BChair_251002.skp"
+      - name: Prepare Test Model
+        run: cp test/test_model.skp test_model.skp
 
       - name: Prepare Output Directory
         run: mkdir -p output
