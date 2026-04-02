@@ -7,11 +7,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
     WINEDLLOVERRIDES=mscoree,mshtml= \
     WINEPREFIX=/root/.wine
 
+# Install dependencies and Wine
+# For arm64, we need to use qemu-user-static to emulate x86_64
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
         wine64 \
         xvfb \
+        qemu-user-static \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

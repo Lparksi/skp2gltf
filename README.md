@@ -95,6 +95,12 @@ skp2gltf.exe "C:\models\model.skp" "C:\models\output" "result" gltf
 - Alpine 镜像（体积更小）：https://github.com/Lparksi/skp2gltf/pkgs/container/skp2gltf-alpine
 - 标准镜像（Debian）：https://github.com/users/Lparksi/packages/container/package/skp2gltf
 
+### 多架构支持
+
+Docker 镜像支持以下架构：
+- `linux/amd64` (x86_64) - 原生支持
+- `linux/arm64` (aarch64) - 通过 QEMU 模拟支持，适用于 Apple Silicon Mac 和 ARM 服务器
+
 拉取镜像：
 ```bash
 docker pull ghcr.io/lparksi/skp2gltf:latest
@@ -106,10 +112,18 @@ docker pull ghcr.io/lparksi/skp2gltf-alpine:latest
 docker run --rm -e WINEDLLOVERRIDES="mscoree,mshtml=" -v "${PWD}:/work" ghcr.io/lparksi/skp2gltf-alpine:latest /work/model.skp /work/output result
 ```
 
+### macOS (Apple Silicon) 使用说明
+
+在 macOS 上使用 Docker 时，请确保：
+1. 安装 Docker Desktop for Mac
+2. 启用 "Use Rosetta for x86_64/amd64 emulation on Apple Silicon" 选项（在 Docker Desktop 设置中）
+3. 首次运行可能需要等待 Wine 初始化完成
+
 说明：
 - 容器会将参数透传给 `skp2gltf.exe <input.skp> <output_dir> <output_name> [output_format]`
 - 输入文件和输出目录都需要位于挂载目录中（示例里是 `/work`）
 - 如果首次运行只看到 `wine: created the configuration directory '/root/.wine'`，通常是 Wine 初始化阶段；建议保留上面的 `WINEDLLOVERRIDES` 环境变量避免卡住
+- 在 arm64 架构上，通过 QEMU 模拟运行 x86_64 代码，性能可能低于原生 amd64 架构
 
 ## 贡献
 

@@ -6,10 +6,13 @@ ENV DISPLAY=:99 \
     WINEDLLOVERRIDES=mscoree,mshtml= \
     WINEPREFIX=/root/.wine
 
+# Install dependencies and Wine
+# For arm64, we need to use qemu-user-static to emulate x86_64
 RUN apk add --no-cache \
         ca-certificates \
         wine \
-        xvfb
+        xvfb \
+        qemu-x86_64
 
 WORKDIR /app
 

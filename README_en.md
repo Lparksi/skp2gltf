@@ -95,6 +95,12 @@ The project is published on GitHub Container Registry:
 - Alpine image (smaller size): https://github.com/Lparksi/skp2gltf/pkgs/container/skp2gltf-alpine
 - Standard image (Debian): https://github.com/users/Lparksi/packages/container/package/skp2gltf
 
+### Multi-Architecture Support
+
+Docker images support the following architectures:
+- `linux/amd64` (x86_64) - Native support
+- `linux/arm64` (aarch64) - Supported via QEMU emulation, suitable for Apple Silicon Macs and ARM servers
+
 Pull images:
 ```bash
 docker pull ghcr.io/lparksi/skp2gltf:latest
@@ -106,10 +112,18 @@ Run example (container arguments are the same as CLI):
 docker run --rm -e WINEDLLOVERRIDES="mscoree,mshtml=" -v "${PWD}:/work" ghcr.io/lparksi/skp2gltf-alpine:latest /work/model.skp /work/output result
 ```
 
+### macOS (Apple Silicon) Usage Notes
+
+When using Docker on macOS, please ensure:
+1. Install Docker Desktop for Mac
+2. Enable "Use Rosetta for x86_64/amd64 emulation on Apple Silicon" option (in Docker Desktop settings)
+3. First run may require waiting for Wine initialization to complete
+
 Notes:
 - The container forwards arguments to `skp2gltf.exe <input.skp> <output_dir> <output_name> [output_format]`
 - Input file and output directory must both be inside the mounted directory (in this example, `/work`)
 - If the first run only prints `wine: created the configuration directory '/root/.wine'`, it is usually stuck in Wine initialization. Keep the `WINEDLLOVERRIDES` environment variable shown above to avoid this hang.
+- On arm64 architecture, x86_64 code runs via QEMU emulation, which may have lower performance compared to native amd64 architecture
 
 ## Contributing
 
