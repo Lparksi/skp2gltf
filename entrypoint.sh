@@ -11,6 +11,8 @@ if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
     # Check if qemu-x86_64 is available
     if command -v qemu-x86_64 >/dev/null 2>&1; then
         QEMU_BIN="qemu-x86_64"
+    elif command -v qemu-x86_64-static >/dev/null 2>&1; then
+        QEMU_BIN="qemu-x86_64-static"
     else
         echo "qemu-x86_64 is not installed in this image" >&2
         exit 127
