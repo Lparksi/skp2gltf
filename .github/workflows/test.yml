@@ -1,0 +1,51 @@
+name: Functionality Test
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+
+jobs:
+  test-conversion:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure (CMake)
+        run: cmake -S . -B build -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build (Release)
+        run: cmake --build build --config Release --parallel
+
+      - name: Download Test Model
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://file.parksi.cc/Dining%2BChair_251002.skp" -OutFile "test_model.skp"
+
+      - name: Run Conversion Test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $releaseDir = "build/Release"
+          
+          # Create output directory
+          New-Item -ItemType Directory -Force -Path "output" | Out-Null
+          
+          # Run the skp2gltf binary
+          Write-Host "Starting conversion..."
+          & "$releaseDir/skp2gltf.exe" "test_model.skp" "output" "result" "glb"
+          
+          if ($LASTEXITCODE -ne 0) {
+            throw "Conversion utility failed with exit code $LASTEXITCODE"
+          }
+          
+          # Verify that result.glb exists
+          if (-not (Test-Path "output/result.glb")) {
+            throw "Conversion command succeeded but output/result.glb was not found!"
+          }
+          
+          $fileInfo = Get-Item "output/result.glb"
+          Write-Host "Test Passed! Output file size: $($fileInfo.Length) bytes."
