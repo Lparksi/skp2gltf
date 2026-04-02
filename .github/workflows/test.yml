@@ -53,13 +53,27 @@ jobs:
       - name: Stage Docker Binaries
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path docker-bin -Force | Out-Null
-          # Use build/Release for binary and lib/ for source DLLs as backup
-          Copy-Item build/Release/*.exe docker-bin/
-          Copy-Item build/Release/*.dll docker-bin/
-          # Ensure all SketchUp DLLs are captured if they weren't in Release for some reason
+          $binDir = "docker-bin"
+          New-Item -ItemType Directory -Path $binDir -Force | Out-Null
+          
+          # Copy our build results
+          Copy-Item build/Release/*.exe $binDir/
+          Copy-Item build/Release/*.dll $binDir/
+          
+          # Copy SketchUp SDK DLLs from lib/ just in case
           if (Test-Path "lib/*.dll") {
-            Copy-Item lib/*.dll docker-bin/ -ErrorAction SilentlyContinue
+            Copy-Item lib/*.dll $binDir/ -ErrorAction SilentlyContinue
+          }
+          
+          # IMPORTANT: SketchUp SDK depends on MSVC Runtime DLLs.
+          # We need to collect them from the runner to bundle into the Docker image.
+          $sys32 = "C:\Windows\System32"
+          $msvcDlls = @("vcruntime140.dll", "msvcp140.dll", "msvcp140_1.dll", "msvcp140_2.dll", "msvcp140_codecvt_ids.dll")
+          foreach ($dll in $msvcDlls) {
+            if (Test-Path "$sys32\$dll") {
+              Write-Host "Copying $dll from system32..."
+              Copy-Item "$sys32\$dll" $binDir/
+            }
           }
 
       - name: Upload Docker Binaries for Docker Test
@@ -96,7 +110,6 @@ jobs:
         run: |
           docker run --rm \
             -e WINEDLLOVERRIDES="mscoree,mshtml=" \
-            -e WINEDEBUG=+loaddll \
             -v "${PWD}:/work" \
             skp2gltf-test \
             /work/test_model.skp /work/output result glb
