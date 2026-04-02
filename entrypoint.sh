@@ -23,6 +23,8 @@ if command -v wine64 >/dev/null 2>&1; then
     WINE_BIN="wine64"
 elif command -v wine >/dev/null 2>&1; then
     WINE_BIN="wine"
+elif [ -x /usr/lib/wine/wine64 ]; then
+    WINE_BIN="/usr/lib/wine/wine64"
 else
     echo "wine is not installed in this image" >&2
     exit 127
@@ -46,7 +48,11 @@ sleep 1
 set +e
 # Use qemu emulation for arm64 architecture
 if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-    "$QEMU_BIN" -L /usr /usr/bin/"$WINE_BIN" /app/skp2gltf.exe "$@"
+    if [ "${WINE_BIN#/}" != "$WINE_BIN" ]; then
+        "$QEMU_BIN" -L /usr "$WINE_BIN" /app/skp2gltf.exe "$@"
+    else
+        "$QEMU_BIN" -L /usr /usr/bin/"$WINE_BIN" /app/skp2gltf.exe "$@"
+    fi
 else
     "$WINE_BIN" /app/skp2gltf.exe "$@"
 fi
