@@ -54,9 +54,13 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path docker-bin -Force | Out-Null
-          Copy-Item build/Release/skp2gltf.exe docker-bin/
-          Copy-Item build/Release/SketchUpAPI.dll docker-bin/
-          Copy-Item build/Release/SketchUpCommonPreferences.dll docker-bin/
+          # Use build/Release for binary and lib/ for source DLLs as backup
+          Copy-Item build/Release/*.exe docker-bin/
+          Copy-Item build/Release/*.dll docker-bin/
+          # Ensure all SketchUp DLLs are captured if they weren't in Release for some reason
+          if (Test-Path "lib/*.dll") {
+            Copy-Item lib/*.dll docker-bin/ -ErrorAction SilentlyContinue
+          }
 
       - name: Upload Docker Binaries for Docker Test
         uses: actions/upload-artifact@v4
