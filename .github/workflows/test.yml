@@ -237,8 +237,8 @@ jobs:
 
       - name: Tag and Push Final
         run: |
-          TEST_TAG="${{ needs.build-docker-image.outputs.image_tag }}"
           REPO="ghcr.io/${{ steps.image_info.outputs.repo }}"
+          TEST_TAG="${REPO}:test-${{ github.sha }}"
           
           # Push both architecture tags to latest
           docker buildx imagetools create --tag ${REPO}:latest-amd64 ${TEST_TAG}-amd64
