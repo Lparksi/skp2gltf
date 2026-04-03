@@ -247,3 +247,42 @@ jobs:
             docker buildx imagetools create --tag ${REPO}:${VER} ${TEST_TAG}-amd64 ${TEST_TAG}-arm64
           fi
 
+  # 6. 创建 GitHub Release
+  create-release:
+    name: Create GitHub Release
+    needs: [build-windows, test-docker-multiplatform]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Windows Binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-binaries
+          path: bin
+
+      - name: Archive Binaries
+        run: |
+          cd bin
+          zip -r ../skp2gltf-win-x64.zip .
+          cd ..
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: skp2gltf-win-x64.zip
+          body: |
+            ## Docker Image
+            `docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}`
+
+            Supported Platforms:
+            - `linux/amd64` (Native x86_64)
+            - `linux/arm64` (Box64 Emulation)
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
