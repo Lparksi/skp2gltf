@@ -11,6 +11,6 @@ target_include_directories(gltflib PUBLIC
     ${PROJECT_SOURCE_DIR}/include
 )
 
-target_link_libraries(gltflib PRIVATE
+target_link_libraries(gltflib PUBLIC
     draco
 )
