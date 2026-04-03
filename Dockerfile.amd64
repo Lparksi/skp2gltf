@@ -7,7 +7,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     WINEARCH=win64 \
     WINEDEBUG=-all \
     WINEDLLOVERRIDES=mscoree,mshtml= \
-    WINEPREFIX=/root/.wine
+    WINEPREFIX=/root/.wine \
+    UV_SYSTEM_PYTHON=1 \
+    UV_BREAK_SYSTEM_PACKAGES=1
 
 # Install base dependencies
 RUN apt-get update && \
@@ -46,7 +48,7 @@ COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Install Python dependencies using uv
-RUN uv pip install --system .
+RUN uv pip install .
 
 EXPOSE 8000
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
