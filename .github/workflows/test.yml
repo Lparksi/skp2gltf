@@ -191,6 +191,7 @@ jobs:
           
           mkdir -p output
           docker run --rm \
+            --platform ${{ matrix.platform }} \
             -v "${PWD}:/work" \
             ${IMAGE_TAG} \
             /work/test/test_model.skp /work/output result glb
