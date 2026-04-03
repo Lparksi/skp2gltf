@@ -70,7 +70,7 @@ async def run_conversion(input_path: str, output_dir: str, output_name: str, for
     
     return True, stdout.decode()
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health():
     # Check if Xvfb lock exists
     xvfb_active = os.path.exists("/tmp/.X99-lock")
