@@ -10,3 +10,7 @@ add_library(gltflib
 target_include_directories(gltflib PUBLIC
     ${PROJECT_SOURCE_DIR}/include
 )
+
+target_link_libraries(gltflib PRIVATE
+    draco_static
+)

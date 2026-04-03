@@ -27,6 +27,22 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 # 包含 SketchUp SDK 配置
 include(sketchup-sdk)
 
+# 自动从官方 GitHub 下载并集成 Draco
+include(FetchContent)
+FetchContent_Declare(
+    draco
+    GIT_REPOSITORY https://github.com/google/draco.git
+    GIT_TAG        1.5.7  # 使用稳定的 1.5.7 版本
+)
+
+# 配置 Draco 编译选项，仅编译核心库以节省时间
+set(DRACO_INSTALL OFF CACHE BOOL "" FORCE)
+set(DRACO_JS_GLUE OFF CACHE BOOL "" FORCE)
+set(DRACO_ANIMATION ON CACHE BOOL "" FORCE)
+set(DRACO_MESH_COMPRESSION ON CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(draco)
+
 include_directories(
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/include/exportgltf
@@ -34,7 +50,7 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/include/skp2xml
 
     ${PROJECT_SOURCE_DIR}/thirdparty
-    ${PROJECT_SOURCE_DIR}/thirdparty/draco
+    # ${PROJECT_SOURCE_DIR}/thirdparty/draco  # 不再需要硬编码路径，FetchContent 会处理
     ${PROJECT_SOURCE_DIR}/thirdparty/pugixml
     ${PROJECT_SOURCE_DIR}/thirdparty/nlohmann
     ${PROJECT_SOURCE_DIR}/thirdparty/rapidjson
@@ -70,9 +86,9 @@ target_link_libraries(skp2gltf PRIVATE
     gltflib
     skp2xml
     tinyxml2
+    draco_static # 使用 FetchContent 生成的 target
     ${CMAKE_SOURCE_DIR}/lib/SketchUpAPI.lib
     ${CMAKE_SOURCE_DIR}/lib/sketchup.lib
-    ${CMAKE_SOURCE_DIR}/lib/draco.lib
 )
 
 # 复制运行时依赖的 SKP_DLL 到输出目录
