@@ -7,25 +7,49 @@ ENV DEBIAN_FRONTEND=noninteractive \
     WINEDLLOVERRIDES=mscoree,mshtml= \
     WINEPREFIX=/root/.wine
 
-# Install dependencies and Wine
-# For x86_64 hosts, we need both wine64 and wine32 (i386) for full functionality.
-# For arm64 hosts, we use qemu-user-static to emulate x86_64.
-RUN dpkg --add-architecture i386 && \
-    apt-get update && \
+# Install dependencies
+RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
-        wine \
-        wine64 \
-        wine32:i386 \
+        curl \
+        git \
+        cmake \
+        build-essential \
+        python3 \
         xvfb \
-        qemu-user-static \
+        gnupg2 \
     && rm -rf /var/lib/apt/lists/*
 
-# Pre-initialize the Wine prefix to avoid slow first-run initialization during tests
+# Install Box64 for arm64 (Build from source for optimal performance)
+RUN if [ "$(uname -m)" = "aarch64" ]; then \
+        git clone https://github.com/ptitSeb/box64.git --depth 1 && \
+        cd box64 && mkdir build && cd build && \
+        cmake .. -DARM64=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo && \
+        make -j$(nproc) && make install && \
+        cd ../.. && rm -rf box64; \
+    fi
+
+# Setup Wine (Using official WineHQ repo structure or architecture-aware install)
+# Note: On aarch64, we need the amd64 version of wine to run x64 exes via Box64.
+RUN dpkg --add-architecture amd64 && \
+    mkdir -pm755 /etc/apt/keyrings && \
+    curl -fsSL https://dl.winehq.org/wine-builds/winehq.key | gpg --dearmor -o /etc/apt/keyrings/winehq-archive.key && \
+    curl -fsSL https://dl.winehq.org/wine-builds/debian/dists/bookworm/winehq-bookworm.sources -o /etc/apt/sources.list.d/winehq-bookworm.sources && \
+    apt-get update && \
+    if [ "$(uname -m)" = "aarch64" ]; then \
+        # On ARM64, we manually pull the amd64 packages for box64 to use
+        apt-get install -y --no-install-recommends winehq-stable:amd64 || \
+        (apt-get download wine-stable-amd64 wine-stable:amd64 && dpkg -i --force-depends *.deb && rm *.deb); \
+    else \
+        apt-get install -y --no-install-recommends winehq-stable; \
+    fi && \
+    rm -rf /var/lib/apt/lists/*
+
+# Pre-initialize Win64 prefix
 RUN Xvfb :99 -screen 0 1024x768x24 & \
     PID=$! && \
     sleep 2 && \
-    DISPLAY=:99 WINEDEBUG=-all wineboot --init && \
+    DISPLAY=:99 WINEDEBUG=-all wine64 wineboot --init && \
     wineserver -w && \
     kill $PID || true
 

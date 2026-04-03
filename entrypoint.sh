@@ -5,16 +5,13 @@ set -eu
 ARCH=$(uname -m)
 echo "Detected architecture: $ARCH"
 
-# For arm64/aarch64, we need to use qemu to emulate x86_64
+# For arm64/aarch64, we need to use Box64 to emulate x86_64 with high performance
 if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-    echo "Running on arm64 architecture, using qemu-x86_64 for emulation"
-    # Check if qemu-x86_64 is available
-    if command -v qemu-x86_64 >/dev/null 2>&1; then
-        QEMU_BIN="qemu-x86_64"
-    elif command -v qemu-x86_64-static >/dev/null 2>&1; then
-        QEMU_BIN="qemu-x86_64-static"
+    echo "Running on arm64 architecture, using Box64 for high-performance emulation"
+    if command -v box64 >/dev/null 2>&1; then
+        EMULATOR_BIN="box64"
     else
-        echo "qemu-x86_64 is not installed in this image" >&2
+        echo "box64 is not installed in this image" >&2
         exit 127
     fi
 fi
@@ -48,9 +45,9 @@ trap cleanup EXIT INT TERM
 sleep 1
 
 set +e
-# Use qemu emulation for arm64 architecture
+# Use Box64 emulation for arm64 architecture
 if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-    "$QEMU_BIN" -L /usr "$WINE_BIN" /app/skp2gltf.exe "$@"
+    "$EMULATOR_BIN" "$WINE_BIN" /app/skp2gltf.exe "$@"
 else
     "$WINE_BIN" /app/skp2gltf.exe "$@"
 fi
