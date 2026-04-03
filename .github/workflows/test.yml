@@ -162,6 +162,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Setup UV
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.12'
+          enable-cache: true
+
       - name: Run Test (CLI Mode)
         run: |
           mkdir -p output
@@ -172,10 +178,8 @@ jobs:
           echo "::group::Starting API Container"
           docker run -d --name skp_api -p 8000:8000 -v "${PWD}:/work" ${{ needs.build-docker-amd64.outputs.tag }}
           echo "::endgroup::"
-          echo "::group::Setup Test Environment with UV"
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          source $HOME/.cargo/env
-          uv pip install httpx pytest pytest-asyncio --system
+          echo "::group::Setup Test Environment"
+          uv pip install httpx pytest pytest-asyncio
           echo "::endgroup::"
           echo "::group::Waiting for API"
           curl --retry 30 --retry-connrefused --retry-delay 1 --output /dev/null --silent --show-error --fail http://localhost:8000/health
@@ -235,6 +239,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Setup UV
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.12'
+          enable-cache: true
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Run Test (CLI Mode)
@@ -247,10 +257,8 @@ jobs:
           echo "::group::Starting API Container"
           docker run -d --name skp_api --platform linux/arm64 -p 8000:8000 -v "${PWD}:/work" ${{ needs.build-docker-arm64.outputs.tag }}
           echo "::endgroup::"
-          echo "::group::Setup Test Environment with UV"
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          source $HOME/.cargo/env
-          uv pip install httpx pytest pytest-asyncio --system
+          echo "::group::Setup Test Environment"
+          uv pip install httpx pytest pytest-asyncio
           echo "::endgroup::"
           echo "::group::Waiting for API"
           curl --retry 30 --retry-connrefused --retry-delay 1 --output /dev/null --silent --show-error --fail http://localhost:8000/health
