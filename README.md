@@ -90,36 +90,52 @@ skp2gltf.exe "C:\models\model.skp" "C:\models\output" "result" gltf
 
 ## Docker 使用
 
-项目已发布到 GitHub Container Registry：https://github.com/users/Lparksi/packages/container/package/skp2gltf
+项目提供跨平台 Docker 镜像，托管于 GitHub Container Registry：[ghcr.io/lparksi/skp2gltf](https://github.com/users/Lparksi/packages/container/package/skp2gltf)
 
 ### 多架构支持
 
-Docker 镜像支持以下架构：
-- `linux/amd64` (x86_64) - 原生支持
-- `linux/arm64` (aarch64) - 通过 QEMU 模拟支持，适用于 Apple Silicon Mac 和 ARM 服务器
+我们针对不同架构进行了深度优化：
+- **`linux/amd64`** (x86_64)：基于原生 Wine 环境，适用于常规 Linux 服务器。
+- **`linux/arm64`** (aarch64)：**内置 Box64 高性能模拟层**，专为 Apple Silicon (M1/M2/M3) Mac 和 ARM64 服务器优化，比传统 QEMU 模拟快数倍。
 
-拉取镜像：
+### 拉取镜像
+
+您可以拉取通用标签（自动匹配架构），也可以指定特定架构标签：
 ```bash
+# 通用标签（推荐）
 docker pull ghcr.io/lparksi/skp2gltf:latest
+
+# 特定版本/架构标签
+docker pull ghcr.io/lparksi/skp2gltf:v0.1.1-arm64
+docker pull ghcr.io/lparksi/skp2gltf:v0.1.1-amd64
 ```
 
-运行示例（容器参数与命令行一致）：
+### 运行转换
+
+运行容器时，将本地目录挂载到容器内的 `/work` 即可：
+
 ```bash
-docker run --rm -e WINEDLLOVERRIDES="mscoree,mshtml=" -v "${PWD}:/work" ghcr.io/lparksi/skp2gltf:latest /work/model.skp /work/output result
+# 创建输出目录
+mkdir -p output
+
+# 运行转换
+docker run --rm \
+  -v "${PWD}:/work" \
+  ghcr.io/lparksi/skp2gltf:latest \
+  /work/model.skp /work/output result glb
 ```
 
-### macOS (Apple Silicon) 使用说明
+### 平台说明
 
-在 macOS 上使用 Docker 时，请确保：
-1. 安装 Docker Desktop for Mac
-2. 启用 "Use Rosetta for x86_64/amd64 emulation on Apple Silicon" 选项（在 Docker Desktop 设置中）
-3. 首次运行可能需要等待 Wine 初始化完成
+#### macOS (Apple Silicon M1/M2/M3)
+容器启动时会自动检测 `aarch64` 架构并激活 Box64 模拟引擎。
+- 请确保 Docker Desktop 设置中开启了 "Use Rosetta for x86_64/amd64 emulation" 以获得最佳性能。
+- 首次运行会进行 Wine 初始化，请耐心等待出现 `finished` 提示。
 
-说明：
-- 容器会将参数透传给 `skp2gltf.exe <input.skp> <output_dir> <output_name> [output_format]`
-- 输入文件和输出目录都需要位于挂载目录中（示例里是 `/work`）
-- 如果首次运行只看到 `wine: created the configuration directory '/root/.wine'`，通常是 Wine 初始化阶段；建议保留上面的 `WINEDLLOVERRIDES` 环境变量避免卡住
-- 在 arm64 架构上，通过 QEMU 模拟运行 x86_64 代码，性能可能低于原生 amd64 架构
+#### 注意事项
+- 参数格式为：`skp2gltf <input_path> <output_dir> <output_name> [format]`。
+- 输入路径和输出目录必须使用挂载后的容器内路径（如 `/work/...`）。
+- 镜像内部已预设 `WINEDLLOVERRIDES="mscoree,mshtml="`，通常无需额外配置即可运行。
 
 ## 贡献
 
