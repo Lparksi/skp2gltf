@@ -1,3 +1,6 @@
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 /*
  * @Author: yaol 
  * @Date: 2025-02-18 17:26:05 

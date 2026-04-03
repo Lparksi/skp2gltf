@@ -1,3 +1,6 @@
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 // Copyright 2013 Trimble Navigation Limited. All Rights Reserved.
 
 /*
