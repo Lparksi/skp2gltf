@@ -90,36 +90,52 @@ Note:
 
 ## Docker Usage
 
-The project is published on GitHub Container Registry: https://github.com/users/Lparksi/packages/container/package/skp2gltf
+Cross-platform Docker images are available at GitHub Container Registry: [ghcr.io/lparksi/skp2gltf](https://github.com/users/Lparksi/packages/container/package/skp2gltf)
 
 ### Multi-Architecture Support
 
-Docker images support the following architectures:
-- `linux/amd64` (x86_64) - Native support
-- `linux/arm64` (aarch64) - Supported via QEMU emulation, suitable for Apple Silicon Macs and ARM servers
+We have deep optimizations for different architectures:
+- **`linux/amd64`** (x86_64): Based on native Wine environment, suitable for standard Linux servers.
+- **`linux/arm64`** (aarch64): **Built-in Box64 high-performance emulation**, optimized for Apple Silicon (M1/M2/M3) Macs and ARM64 servers. It's significantly faster than traditional QEMU emulation.
 
-Pull images:
+### Pulling Images
+
+You can pull the generic tag (architecture auto-matched) or specify an architecture-specific tag:
 ```bash
+# Generic tag (Recommended)
 docker pull ghcr.io/lparksi/skp2gltf:latest
+
+# Specific version/arch tags
+docker pull ghcr.io/lparksi/skp2gltf:v0.1.1-arm64
+docker pull ghcr.io/lparksi/skp2gltf:v0.1.1-amd64
 ```
 
-Run example (container arguments are the same as CLI):
+### Running Conversions
+
+Mount your local directory to `/work` inside the container:
+
 ```bash
-docker run --rm -e WINEDLLOVERRIDES="mscoree,mshtml=" -v "${PWD}:/work" ghcr.io/lparksi/skp2gltf:latest /work/model.skp /work/output result
+# Create output directory
+mkdir -p output
+
+# Run conversion
+docker run --rm \
+  -v "${PWD}:/work" \
+  ghcr.io/lparksi/skp2gltf:latest \
+  /work/model.skp /work/output result glb
 ```
 
-### macOS (Apple Silicon) Usage Notes
+### Platform Notes
 
-When using Docker on macOS, please ensure:
-1. Install Docker Desktop for Mac
-2. Enable "Use Rosetta for x86_64/amd64 emulation on Apple Silicon" option (in Docker Desktop settings)
-3. First run may require waiting for Wine initialization to complete
+#### macOS (Apple Silicon M1/M2/M3)
+The container auto-detects `aarch64` and activates the Box64 emulation engine.
+- Ensure "Use Rosetta for x86_64/amd64 emulation" is enabled in Docker Desktop settings for best performance.
+- First-time runs may take longer for Wine initialization; please wait for the `finished` prompt.
 
-Notes:
-- The container forwards arguments to `skp2gltf.exe <input.skp> <output_dir> <output_name> [output_format]`
-- Input file and output directory must both be inside the mounted directory (in this example, `/work`)
-- If the first run only prints `wine: created the configuration directory '/root/.wine'`, it is usually stuck in Wine initialization. Keep the `WINEDLLOVERRIDES` environment variable shown above to avoid this hang.
-- On arm64 architecture, x86_64 code runs via QEMU emulation, which may have lower performance compared to native amd64 architecture
+#### Important Notes
+- Argument format: `skp2gltf <input_path> <output_dir> <output_name> [format]`.
+- Input file and output directory must use the mounted container path (e.g., `/work/...`).
+- `WINEDLLOVERRIDES="mscoree,mshtml="` is pre-configured in the image, so usually no additional setup is required.
 
 ## Contributing
 
