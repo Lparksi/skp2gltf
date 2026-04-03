@@ -59,9 +59,9 @@ void ParseMeshdata::getAllMeshes()
                 int end                           = start + model->accessors[position].count * byteStride;
                 std::vector<uchar> &bufferViewers = allBufferViewers[bufferViewerIndex];
                 std::vector<uchar> bufferViewer(bufferViewers.begin() + start, bufferViewers.begin() + end);
-                for (int i = 0; i < bufferViewer.size(); i += byteStride)
+                for (size_t i = 0; i < bufferViewer.size(); i += byteStride)
                 {
-                    for (int j = 0; j < typeSize; ++j)
+                    for (size_t j = 0; j < typeSize; ++j)
                     {
                         positionSize++;
                         if (byteLength == 4)
@@ -93,9 +93,9 @@ void ParseMeshdata::getAllMeshes()
                 int end                           = start + model->accessors[color].count * byteStride;
                 std::vector<uchar> &bufferViewers = allBufferViewers[bufferViewerIndex];
                 std::vector<uchar> bufferViewer(bufferViewers.begin() + start, bufferViewers.begin() + end);
-                for (int i = 0; i < bufferViewer.size(); i += byteStride)
+                for (size_t i = 0; i < bufferViewer.size(); i += byteStride)
                 {
-                    for (int j = 0; j < typeSize; ++j)
+                    for (size_t j = 0; j < typeSize; ++j)
                     {
                         positionSize++;
                         if (byteLength == 4)
@@ -127,9 +127,9 @@ void ParseMeshdata::getAllMeshes()
                 int end                           = start + model->accessors[normal].count * byteStride;
                 std::vector<uchar> &bufferViewers = allBufferViewers[bufferViewerIndex];
                 std::vector<uchar> bufferViewer(bufferViewers.begin() + start, bufferViewers.begin() + end);
-                for (int i = 0; i < bufferViewer.size();)
+                for (size_t i = 0; i < bufferViewer.size();)
                 {
-                    for (int j = 0; j < typeSize; ++j)
+                    for (size_t j = 0; j < typeSize; ++j)
                     {
                         if (byteLength == 4)
                         {
@@ -161,9 +161,9 @@ void ParseMeshdata::getAllMeshes()
                 int end                           = start + model->accessors[normal].count * byteStride;
                 std::vector<uchar> &bufferViewers = allBufferViewers[bufferViewerIndex];
                 std::vector<uchar> bufferViewer(bufferViewers.begin() + start, bufferViewers.begin() + end);
-                for (int i = 0; i < bufferViewer.size();)
+                for (size_t i = 0; i < bufferViewer.size();)
                 {
-                    for (int j = 0; j < typeSize; ++j)
+                    for (size_t j = 0; j < typeSize; ++j)
                     {
                         if (byteLength == 4)
                         {
@@ -183,15 +183,15 @@ void ParseMeshdata::getAllMeshes()
             }
             int indecIndex                    = iter_primitives->indices;
             int bufferViewerIndex             = model->accessors[indecIndex].bufferView;
-            int start                         = model->accessors[indecIndex].byteOffset;
-            size_t componentType              = model->accessors[indecIndex].componentType;
+            int start                         = static_cast<int>(model->accessors[indecIndex].byteOffset);
+            int componentType                 = model->accessors[indecIndex].componentType;
             int byteLength                    = tinygltf::GetComponentSizeInBytes(componentType);
-            int end                           = start + model->accessors[indecIndex].count * byteLength;
+            int end                           = start + static_cast<int>(model->accessors[indecIndex].count * byteLength);
             std::vector<uchar> &bufferViewers = allBufferViewers[bufferViewerIndex];
             std::vector<uchar> bufferViewer(bufferViewers.begin() + start, bufferViewers.begin() + end);
             if (byteLength == 2)
             {
-                for (int i = 0; i < bufferViewer.size(); i += 2)
+                for (size_t i = 0; i < bufferViewer.size(); i += 2)
                 {
                     unsigned int f;
                     uchar temp[4];
@@ -205,7 +205,7 @@ void ParseMeshdata::getAllMeshes()
             }
             else if (byteLength == 4)
             {
-                for (int i = 0; i < bufferViewer.size(); i += 4)
+                for (size_t i = 0; i < bufferViewer.size(); i += 4)
                 {
                     unsigned int f;
                     uchar temp[4];

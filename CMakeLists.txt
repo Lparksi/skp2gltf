@@ -8,10 +8,13 @@ endif()
 
 # 根据编译类型设置编译选项
 if(MSVC)
-    # Debug 配置
-    set(CMAKE_CXX_FLAGS_DEBUG "/MTd /Zi /Ob0 /Od /RTC1")
-    # Release 配置
-    set(CMAKE_CXX_FLAGS_RELEASE "/MT /O2 /Ob2 /DNDEBUG")
+    # 增加安全警告忽略
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+    
+    # Debug 配置使用 /MDd (Dynamic Debug)
+    set(CMAKE_CXX_FLAGS_DEBUG "/MDd /Zi /Ob0 /Od /RTC1")
+    # Release 配置使用 /MD (Dynamic Release)
+    set(CMAKE_CXX_FLAGS_RELEASE "/MD /O2 /Ob2 /DNDEBUG")
 endif()
 
 set(CMAKE_CXX_STANDARD 14)
