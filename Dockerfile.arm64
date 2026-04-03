@@ -8,8 +8,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     WINEDEBUG=-all \
     WINEDLLOVERRIDES=mscoree,mshtml= \
     WINEPREFIX=/root/.wine \
-    UV_SYSTEM_PYTHON=1 \
-    UV_BREAK_SYSTEM_PACKAGES=1
+    PATH="/app/.venv/bin:$PATH"
 
 # Install base dependencies (ARM64 specific)
 # Native ARM64 libs are needed by Box64 for Wine performance and functionality
@@ -73,8 +72,7 @@ COPY api.py pyproject.toml /app/
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Install Python dependencies using uv
-RUN uv pip install .
+RUN uv sync --no-dev --no-install-project
 
 EXPOSE 8000
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

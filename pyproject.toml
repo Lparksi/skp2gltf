@@ -17,7 +17,3 @@ test = [
 
 [tool.uv]
 managed = true
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
