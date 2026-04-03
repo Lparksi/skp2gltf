@@ -47,7 +47,7 @@ sleep 1
 # Service mode: start the FastAPI server
 if [ "${1:-}" = "--service" ]; then
     echo "Starting skp2gltf API service on port 8000..."
-    export PYTHONPATH="/app:$PYTHONPATH"
+    export PYTHONPATH="/app:${PYTHONPATH:-}"
     if command -v uvicorn >/dev/null 2>&1; then
         exec uvicorn api:app --host 0.0.0.0 --port 8000
     else
