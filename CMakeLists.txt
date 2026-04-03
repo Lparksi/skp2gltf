@@ -43,12 +43,6 @@ set(DRACO_MESH_COMPRESSION ON CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(draco)
 
-# 修复 Draco target 的包含路径，确保生成的 draco_features.h 能被找到
-target_include_directories(draco INTERFACE 
-    $<BUILD_INTERFACE:${draco_SOURCE_DIR}/src>
-    $<BUILD_INTERFACE:${draco_BINARY_DIR}>
-)
-
 include_directories(
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/include/exportgltf
@@ -56,7 +50,6 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/include/skp2xml
 
     ${PROJECT_SOURCE_DIR}/thirdparty
-    # ${PROJECT_SOURCE_DIR}/thirdparty/draco  # 不再需要硬编码路径，FetchContent 会处理
     ${PROJECT_SOURCE_DIR}/thirdparty/pugixml
     ${PROJECT_SOURCE_DIR}/thirdparty/nlohmann
     ${PROJECT_SOURCE_DIR}/thirdparty/rapidjson
@@ -65,6 +58,8 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/thirdparty/rapidxml
     ${PROJECT_SOURCE_DIR}/thirdparty/tinyxml2
     ${PROJECT_SOURCE_DIR}/thirdparty/xml2json
+    ${draco_SOURCE_DIR}/src
+    ${draco_BINARY_DIR}
 )
 
 # 添加子目录
