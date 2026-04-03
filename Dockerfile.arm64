@@ -19,9 +19,9 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Setup Box64 + Kron4ek Wine (optimized for ARM64)
-RUN wget -qO- https://ryanfortner.github.io/box64-debs/KEY.gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/box64-debs-archive-keyring.gpg && \
-    echo "deb [arch=arm64] https://ryanfortner.github.io/box64-debs/ ./" > /etc/apt/sources.list.d/box64-debs.list && \
-    apt-get update && apt-get install -y --no-install-recommends box64 && \
+RUN wget -qO- https://pi-apps-coders.github.io/box64-debs/KEY.gpg | gpg --dearmor -o /usr/share/keyrings/box64-archive-keyring.gpg && \
+    printf "Types: deb\nURIs: https://Pi-Apps-Coders.github.io/box64-debs/debian\nSuites: ./\nSigned-By: /usr/share/keyrings/box64-archive-keyring.gpg\n" > /etc/apt/sources.list.d/box64.sources && \
+    apt-get update && apt-get install -y --no-install-recommends box64-generic-arm && \
     mkdir -p /opt/wine-stable && \
     curl -SL https://github.com/Kron4ek/Wine-Builds/releases/download/9.0/wine-9.0-amd64.tar.xz | tar -xJ -C /opt/wine-stable --strip-components=1 && \
     ln -s /opt/wine-stable/bin/wine64 /usr/local/bin/wine64 && \
