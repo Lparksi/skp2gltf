@@ -1,4 +1,6 @@
 FROM debian:bookworm-slim
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 
 ENV DEBIAN_FRONTEND=noninteractive \
     DISPLAY=:99 \
@@ -39,7 +41,9 @@ RUN apt-get update && \
         libgnutls30 \
         libgl1 \
         libglu1-mesa \
+        python3 \
     && rm -rf /var/lib/apt/lists/*
+
 
 # Setup Box64 + Kron4ek Wine (optimized for ARM64)
 RUN wget -qO- https://pi-apps-coders.github.io/box64-debs/KEY.gpg | gpg --dearmor -o /usr/share/keyrings/box64-archive-keyring.gpg && \
@@ -61,9 +65,16 @@ RUN Xvfb :99 -screen 0 1024x768x24 & \
 
 WORKDIR /app
 
-# Copy Windows build artifacts
+# Copy Windows build artifacts and API source
 COPY docker-bin/ /app/
+COPY api.py pyproject.toml /app/
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
+# Install Python dependencies using uv
+RUN uv pip install --system .
+
+EXPOSE 8000
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["--service"]
+

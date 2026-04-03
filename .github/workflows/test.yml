@@ -184,7 +184,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run Test in Docker
+      - name: Run Test (CLI Mode)
         run: |
           REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           IMAGE_TAG="ghcr.io/${REPO_LC}:test-${{ github.sha }}-${{ matrix.arch }}"
@@ -196,13 +196,53 @@ jobs:
             ${IMAGE_TAG} \
             /work/test/test_model.skp /work/output result glb
 
-      - name: Verify Output
+      - name: Verify CLI Output
         run: |
           if [ ! -f "output/result.glb" ]; then
             echo "Error: output/result.glb was not generated."
             exit 1
           fi
           ls -lh output/result.glb
+
+      - name: Run Test (API Mode)
+        run: |
+          REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_TAG="ghcr.io/${REPO_LC}:test-${{ github.sha }}-${{ matrix.arch }}"
+          
+          # Start container in background
+          docker run -d --name skp_api \
+            --platform ${{ matrix.platform }} \
+            -p 8000:8000 \
+            -v "${PWD}:/work" \
+            ${IMAGE_TAG}
+          
+          # Install test dependencies on runner
+          pip install httpx pytest pytest-asyncio
+          
+          # Wait for API to be ready (up to 30s)
+          echo "Waiting for API health check..."
+          MAX_RETRIES=30
+          COUNT=0
+          until $(curl --output /dev/null --silent --head --fail http://localhost:8000/health); do
+              if [ $COUNT -eq $MAX_RETRIES ]; then
+                echo "API failed to start in time"
+                docker logs skp_api
+                exit 1
+              fi
+              printf '.'
+              sleep 1
+              COUNT=$((COUNT+1))
+          done
+          echo "API is up!"
+          
+          # Run API tests
+          export API_URL="http://localhost:8000"
+          pytest tests/test_api.py
+          
+          # Cleanup
+          docker stop skp_api
+          docker rm skp_api
+
 
   # 5. 发布正式镜像 (仅在 main 分支推送到 latest)
   publish-final:

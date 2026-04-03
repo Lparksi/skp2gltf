@@ -110,22 +110,39 @@ docker pull ghcr.io/lparksi/skp2gltf:v0.1.1-arm64
 docker pull ghcr.io/lparksi/skp2gltf:v0.1.1-amd64
 ```
 
-### 运行转换
+### 运行模式
 
-运行容器时，将本地目录挂载到容器内的 `/work` 即可：
+镜像支持两种运行模式：
 
+#### 1. 命令行模式 (CLI)
+适用于单次转换任务，转换完成后容器退出。
 ```bash
-# 创建输出目录
-mkdir -p output
-
-# 运行转换
-docker run --rm \
-  -v "${PWD}:/work" \
-  ghcr.io/lparksi/skp2gltf:latest \
-  /work/model.skp /work/output result glb
+docker run --rm -v "${PWD}:/work" ghcr.io/lparksi/skp2gltf:latest \
+  /work/test/test_model.skp /work/output result glb
 ```
 
+#### 2. 服务模式 (API) - 推荐用于流水线
+容器启动后会开启一个 FastAPI 服务，环境（Wine/Xvfb）常驻内存，响应转换请求速度极快。
+```bash
+# 启动服务
+docker run -d --name skp_api -p 8000:8000 -v "${PWD}:/work" ghcr.io/lparksi/skp2gltf:latest
+```
+
+**API 接口说明：**
+
+*   **健康检查**: `GET http://localhost:8000/health`
+*   **文件上传转换**: `POST http://localhost:8000/convert?format=glb` (Multipart Form)
+*   **路径任务指派**: `POST http://localhost:8000/convert-path`
+    ```json
+    {
+      "input_path": "/work/test/test_model.skp",
+      "output_dir": "/work/output",
+      "format": "glb"
+    }
+    ```
+
 ### 平台说明
+
 
 #### macOS (Apple Silicon M1/M2/M3)
 容器启动时会自动检测 `aarch64` 架构并激活 Box64 模拟引擎。
