@@ -8,6 +8,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     WINEPREFIX=/root/.wine
 
 # Install base dependencies (ARM64 specific)
+# Native ARM64 libs are needed by Box64 for Wine performance and functionality
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -16,6 +17,28 @@ RUN apt-get update && \
         gnupg2 \
         xvfb \
         xz-utils \
+        # Native ARM64 libraries for Box64+Wine
+        libfontconfig1 \
+        libfreetype6 \
+        libx11-6 \
+        libxext6 \
+        libxrender1 \
+        libxrandr2 \
+        libxcursor1 \
+        libxi6 \
+        libxfixes3 \
+        libxcomposite1 \
+        libglib2.0-0 \
+        libpng16-16 \
+        libjpeg62-turbo \
+        libxml2 \
+        libxslt1.1 \
+        libmpg123-0 \
+        libasound2 \
+        libpulse0 \
+        libgnutls30 \
+        libgl1 \
+        libglu1-mesa \
     && rm -rf /var/lib/apt/lists/*
 
 # Setup Box64 + Kron4ek Wine (optimized for ARM64)
