@@ -5,15 +5,15 @@
 
 # SKP2GLTF
 
-A tool for converting SketchUp (.skp) files to glTF/GLB format. It supports Draco mesh compression, which can significantly reduce output file size.
+A professional tool for converting SketchUp (.skp) files to glTF/GLB format. Features Draco mesh compression and a high-performance distributed conversion architecture.
 
 ## Features
 
-- Convert SketchUp (.skp) files to glTF/GLB format
-- Integrate Draco compression to reduce output size effectively
-- Convert materials, textures, and geometry data
-- Support custom compression parameter configuration
-- Support batch processing
+- **Efficient Conversion**: Seamlessly convert SketchUp (.skp) files to glTF/GLB format.
+- **Draco Compression**: Integrated Google Draco algorithm for significant reduction in geometry data size.
+- **Microservice Ready**: Built-in FastAPI-based HTTP service for persistent execution and remote integration.
+- **Cross-Platform Emulation**: Deeply optimized for different architectures, supporting AMD64 (Wine) and ARM64 (Box64 + Wine).
+- **Automated Pipelines**: Standardized Docker images designed for CI/CD workflows.
 
 ## Screenshots
 
@@ -23,147 +23,74 @@ A tool for converting SketchUp (.skp) files to glTF/GLB format. It supports Drac
 ### Conversion Result Preview
 ![Conversion Result Preview](./static/preview.png)
 
-## System Requirements
+## System Requirements (Native)
 
-- Operating system: Windows and Windows Server only
-  - Windows 10/11 64-bit
-  - Windows Server 2016/2019/2022
-- Other requirements:
-  - Visual Studio 2019 or higher (for compilation)
-  - SketchUp 2019 or higher (for runtime)
+- **OS**: Windows 10/11 or Windows Server 2016+ only.
+- **Environment**: Visual Studio 2019+ (Build), SketchUp 2019+ (Runtime).
 
-## Dependencies
+> [!TIP]
+> **Recommended: Run via Docker**. No need to install Windows environments or SketchUp SDK on your host. Supports Linux, macOS, and Windows.
 
-- SketchUp SDK (2019+)
-- Draco compression library
-- TinyGLTF
-- CMake (build system)
+## Docker Usage Guide
 
-## Build Instructions
+Multi-platform images are hosted on GitHub Container Registry: [ghcr.io/lparksi/skp2gltf](https://github.com/users/Lparksi/packages/container/package/skp2gltf)
 
-1. Ensure CMake and a supported C++ compiler are installed.
-2. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd skp2gltf
-   ```
-3. Create the build directory:
-   ```bash
-   mkdir build && cd build
-   ```
-4. Configure and build the project:
-   ```bash
-   cmake ..
-   cmake --build .
-   ```
-
-## Usage
-
-### Basic Usage
-
-After building, the executable `skp2gltf.exe` is located in `build/Debug` or `build/Release` (depending on your build configuration).
-
-Command line format:
+### 1. Pull Image
 ```bash
-skp2gltf.exe <input.skp> <output_dir> <output_name> [output_format]
-```
-
-Parameter description:
-- `<input.skp>`: Input SketchUp file path
-- `<output_dir>`: Output directory path
-- `<output_name>`: Output file name (extension not required)
-- `[output_format]`: Optional output format, supports `glb` or `gltf`, default is `glb`
-
-Example usage:
-```bash
-# Export GLB by default (result.glb)
-skp2gltf.exe "C:\models\model.skp" "C:\models\output" "result"
-
-# Explicitly export GLTF (result.gltf)
-skp2gltf.exe "C:\models\model.skp" "C:\models\output" "result" gltf
-```
-
-Note:
-- Paths containing spaces must be wrapped in quotes
-- The output directory must already exist
-- If `output_format` is not provided, `.glb` is used by default
-
-## Docker Usage
-
-Cross-platform Docker images are available at GitHub Container Registry: [ghcr.io/lparksi/skp2gltf](https://github.com/users/Lparksi/packages/container/package/skp2gltf)
-
-### Multi-Architecture Support
-
-We have deep optimizations for different architectures:
-- **`linux/amd64`** (x86_64): Based on native Wine environment, suitable for standard Linux servers.
-- **`linux/arm64`** (aarch64): **Built-in Box64 high-performance emulation**, optimized for Apple Silicon (M1/M2/M3) Macs and ARM64 servers. It's significantly faster than traditional QEMU emulation.
-
-### Pulling Images
-
-You can pull the generic tag (architecture auto-matched) or specify an architecture-specific tag:
-```bash
-# Generic tag (Recommended)
+# Auto-matches architecture (AMD64 or ARM64)
 docker pull ghcr.io/lparksi/skp2gltf:latest
-
-# Specific version/arch tags
-docker pull ghcr.io/lparksi/skp2gltf:v0.1.1-arm64
-docker pull ghcr.io/lparksi/skp2gltf:v0.1.1-amd64
 ```
 
-### Running Conversions
+### 2. Running Modes
 
-Mount your local directory to `/work` inside the container:
-
+#### Mode A: As an HTTP Microservice (Recommended)
+Best for background processing. The environment (Wine/Xvfb) stays in memory for the fastest response times.
 ```bash
-# Create output directory
-mkdir -p output
+# Start service on port 8000
+docker run -d --name skp_api -p 8000:8000 ghcr.io/lparksi/skp2gltf:latest --service
+```
 
-# Run conversion
-docker run --rm \
-  -v "${PWD}:/work" \
-  ghcr.io/lparksi/skp2gltf:latest \
+**Core API Endpoints:**
+
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/health` | `GET` | Health check, returns architecture and environment status |
+| `/convert` | `POST` | **File Upload**. Upload .skp and receive the converted .glb/.gltf file stream |
+| `/convert-path` | `POST` | **Path Task**. Convert files at a specific container path (useful with mounted volumes) |
+
+#### Mode B: Command Line (CLI)
+Best for simple local scripts.
+```bash
+docker run --rm -v "${PWD}:/work" ghcr.io/lparksi/skp2gltf:latest \
   /work/model.skp /work/output result glb
 ```
 
-### Platform Notes
+### 3. Platform Optimizations
+- **AMD64 (Linux Server)**: Runs on native Wine with minimal overhead.
+- **ARM64 (Apple Silicon M1/M2/M3)**: Built-in **Box64** emulation, significantly faster than standard QEMU. *Ensure "Use Rosetta for x86_64/amd64 emulation" is enabled in Docker Desktop.*
 
-#### macOS (Apple Silicon M1/M2/M3)
-The container auto-detects `aarch64` and activates the Box64 emulation engine.
-- Ensure "Use Rosetta for x86_64/amd64 emulation" is enabled in Docker Desktop settings for best performance.
-- First-time runs may take longer for Wine initialization; please wait for the `finished` prompt.
+> [!NOTE]
+> **Queuing Mechanism**: To ensure maximum stability of the Wine environment, conversion tasks within each container are processed **serially**. For high throughput, scale by increasing the number of container instances.
 
-#### Important Notes
-- Argument format: `skp2gltf <input_path> <output_dir> <output_name> [format]`.
-- Input file and output directory must use the mounted container path (e.g., `/work/...`).
-- `WINEDLLOVERRIDES="mscoree,mshtml="` is pre-configured in the image, so usually no additional setup is required.
+## Native Build (Windows)
 
-## Contributing
-
-Issues and Pull Requests are welcome!
-
-### Lparksi
-
-- Refined documentation structure and kept core sections for features, build, and usage
-- Continuously maintains documentation readability and project information accuracy
+1. Clone repo: `git clone <repository-url> && cd skp2gltf`
+2. Create build dir: `mkdir build && cd build`
+3. Configure & Build:
+   ```bash
+   cmake ..
+   cmake --build . --config Release
+   ```
+4. Run: `skp2gltf.exe <input.skp> <output_dir> <output_name> [format]`
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0 (GPLv3).
-
-### Key Terms
-
-- Free Use: You are free to use, modify, and distribute this software.
-- Open Source Requirement: Any derivative works based on this software must be open-sourced under the same GPLv3 license.
-- Patent Grant: Contributors explicitly grant patent rights.
-- Notice Requirement: Modifications to the source code must be stated prominently.
-- Copy Protection: Additional restrictions are prohibited; GPLv3 rights cannot be limited.
-
-For the complete license text, please refer to: [GNU GPLv3](https://www.gnu.org/licenses/gpl-3.0.html)
-
-Note: This project is recommended for personal use only.
+This project is licensed under the **GNU General Public License v3.0 (GPLv3)**.
+Any derivative works must be open-sourced under the same license.
 
 ## Acknowledgments
 
 - [SketchUp SDK](https://extensions.sketchup.com/developers)
 - [Draco](https://github.com/google/draco)
 - [TinyGLTF](https://github.com/syoyo/tinygltf)
+- [Box64](https://github.com/ptitSeb/box64)

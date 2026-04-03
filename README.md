@@ -5,15 +5,15 @@
 
 # SKP2GLTF
 
-一个用于将 SketchUp (.skp) 文件转换为 glTF/GLB 格式的工具。支持 Draco 网格压缩，可以显著减小输出文件的大小。
+一个用于将 SketchUp (.skp) 文件转换为 glTF/GLB 格式的工具。支持 Draco 网格压缩，提供高性能的分布式转换方案。
 
 ## 功能特性
 
-- 支持 SketchUp (.skp) 文件转换为 glTF/GLB 格式
-- 集成 Draco 压缩算法，可以有效减小输出文件体积
-- 支持材质、纹理和几何数据的转换
-- 支持自定义压缩参数配置
-- 支持批量处理文件
+- **高效转换**: 支持 SketchUp (.skp) 文件完美转换为 glTF/GLB 格式。
+- **Draco 压缩**: 集成 Google Draco 压缩算法，显著减小几何数据体积。
+- **微服务化**: 内置基于 FastAPI 的 HTTP 服务，支持持久化运行和远程调用。
+- **跨平台仿真**: 针对不同架构深度优化，支持 AMD64 (Wine) 和 ARM64 (Box64 + Wine)。
+- **自动化流水线**: 提供标准化的 Docker 镜像，完美契合 CI/CD 工作流。
 
 ## 截图展示
 
@@ -23,164 +23,74 @@
 ### 转换结果预览
 ![转换结果预览](./static/preview.png)
 
-## 系统要求
+## 系统要求 (原生运行)
 
-- 操作系统：仅支持 Windows 和 Windows Server 平台
-  - Windows 10/11 64位
-  - Windows Server 2016/2019/2022
-- 其他要求：
-  - Visual Studio 2019 或更高版本（用于编译）
-  - SketchUp 2019 或更高版本（用于运行时环境）
+- **操作系统**: 仅支持 Windows 10/11 或 Windows Server 2016+。
+- **环境**: Visual Studio 2019+ (编译), SketchUp 2019+ (运行时)。
 
-## 依赖项
+> [!TIP]
+> **推荐通过 Docker 运行**：无需在宿主机安装任何 Windows 环境或 SketchUp SDK，支持 Linux/macOS/Windows 跨平台运行。
 
-- SketchUp SDK (2019+)
-- Draco 压缩库
-- TinyGLTF
-- CMake (构建系统)
+## Docker 使用指南
 
-## 构建说明
+项目提供全自动化的跨平台镜像，托管于 GitHub Container Registry：[ghcr.io/lparksi/skp2gltf](https://github.com/users/Lparksi/packages/container/package/skp2gltf)
 
-1. 确保已安装 CMake 和支持的 C++ 编译器
-2. 克隆仓库：
-   ```bash
-   git clone <repository-url>
-   cd skp2gltf
-   ```
-3. 创建构建目录：
-   ```bash
-   mkdir build && cd build
-   ```
-4. 配置和构建项目：
-   ```bash
-   cmake ..
-   cmake --build .
-   ```
-
-## 使用方法
-
-### 基本用法
-
-编译完成后，可执行文件 `skp2gltf.exe` 位于 `build/Debug` 或 `build/Release` 目录下（取决于编译配置）。
-
-命令行格式：
+### 1. 拉取镜像
 ```bash
-skp2gltf.exe <input.skp> <output_dir> <output_name> [output_format]
-```
-
-参数说明：
-- `<input.skp>`: 输入的 SketchUp 文件路径
-- `<output_dir>`: 输出文件夹路径
-- `<output_name>`: 输出文件名（不需要包含扩展名）
-- `[output_format]`: 可选，输出格式，支持 `glb` 或 `gltf`，默认 `glb`
-
-使用示例：
-```bash
-# 默认导出 GLB（result.glb）
-skp2gltf.exe "C:\models\model.skp" "C:\models\output" "result"
-
-# 显式导出 GLTF（result.gltf）
-skp2gltf.exe "C:\models\model.skp" "C:\models\output" "result" gltf
-```
-
-注意：
-- 如果路径中包含空格，需要用引号括起来
-- 输出文件夹必须已存在
-- 如果不指定 `output_format`，默认输出 `.glb`
-
-## Docker 使用
-
-项目提供跨平台 Docker 镜像，托管于 GitHub Container Registry：[ghcr.io/lparksi/skp2gltf](https://github.com/users/Lparksi/packages/container/package/skp2gltf)
-
-### 多架构支持
-
-我们针对不同架构进行了深度优化：
-- **`linux/amd64`** (x86_64)：基于原生 Wine 环境，适用于常规 Linux 服务器。
-- **`linux/arm64`** (aarch64)：**内置 Box64 高性能模拟层**，专为 Apple Silicon (M1/M2/M3) Mac 和 ARM64 服务器优化，比传统 QEMU 模拟快数倍。
-
-### 拉取镜像
-
-您可以拉取通用标签（自动匹配架构），也可以指定特定架构标签：
-```bash
-# 通用标签（推荐）
+# 自动匹配架构 (AMD64 或 ARM64)
 docker pull ghcr.io/lparksi/skp2gltf:latest
-
-# 特定版本/架构标签
-docker pull ghcr.io/lparksi/skp2gltf:v0.1.1-arm64
-docker pull ghcr.io/lparksi/skp2gltf:v0.1.1-amd64
 ```
 
-### 运行模式
+### 2. 运行模式
 
-镜像支持两种运行模式：
+#### 模式 A：作为 HTTP 微服务 (推荐)
+适用于后台常驻处理，环境（Wine/Xvfb）常驻内存，响应速度最快。
+```bash
+# 启动服务，监听 8000 端口
+docker run -d --name skp_api -p 8000:8000 ghcr.io/lparksi/skp2gltf:latest --service
+```
 
-#### 1. 命令行模式 (CLI)
-适用于单次转换任务，转换完成后容器退出。
+**核心 API 接口：**
+
+| 接口 | 方法 | 说明 |
+| :--- | :--- | :--- |
+| `/health` | `GET` | 健康检查，返回系统架构和运行环境状态 |
+| `/convert` | `POST` | **文件上传转换**。接收 .skp 文件，返回转换后的 .glb/.gltf 文件流 |
+| `/convert-path` | `POST` | **任务指派**。指定容器内路径进行转换，适用于挂载了共享存储的场景 |
+
+#### 模式 B：命令行单次任务 (CLI)
+适用于简单的本地转换脚本。
 ```bash
 docker run --rm -v "${PWD}:/work" ghcr.io/lparksi/skp2gltf:latest \
-  /work/test/test_model.skp /work/output result glb
+  /work/model.skp /work/output result glb
 ```
 
-#### 2. 服务模式 (API) - 推荐用于流水线
-容器启动后会开启一个 FastAPI 服务，环境（Wine/Xvfb）常驻内存，响应转换请求速度极快。
-```bash
-# 启动服务
-docker run -d --name skp_api -p 8000:8000 -v "${PWD}:/work" ghcr.io/lparksi/skp2gltf:latest
-```
+### 3. 不同平台优化
+- **AMD64 (Linux Server)**: 使用原生 Wine，性能损耗极低。
+- **ARM64 (Apple Silicon M1/M2/M3)**: 内置 **Box64** 模拟层，比传统的 QEMU 模拟快数倍。*请确保 Docker Desktop 开启了 "Use Rosetta for x86_64/amd64 emulation"。*
 
-**API 接口说明：**
+> [!NOTE]
+> **排队机制**: 为了保证 Wine 环境运行的极致稳定性，每个容器内部的转换任务采用 **串行执行 (Serial Queue)**。如果需要极高的吞吐量，请横向扩展容器实例数量。
 
-*   **健康检查**: `GET http://localhost:8000/health`
-*   **文件上传转换**: `POST http://localhost:8000/convert?format=glb` (Multipart Form)
-*   **路径任务指派**: `POST http://localhost:8000/convert-path`
-    ```json
-    {
-      "input_path": "/work/test/test_model.skp",
-      "output_dir": "/work/output",
-      "format": "glb"
-    }
-    ```
+## 本地编译 (Windows)
 
-### 平台说明
-
-
-#### macOS (Apple Silicon M1/M2/M3)
-容器启动时会自动检测 `aarch64` 架构并激活 Box64 模拟引擎。
-- 请确保 Docker Desktop 设置中开启了 "Use Rosetta for x86_64/amd64 emulation" 以获得最佳性能。
-- 首次运行会进行 Wine 初始化，请耐心等待出现 `finished` 提示。
-
-#### 注意事项
-- 参数格式为：`skp2gltf <input_path> <output_dir> <output_name> [format]`。
-- 输入路径和输出目录必须使用挂载后的容器内路径（如 `/work/...`）。
-- 镜像内部已预设 `WINEDLLOVERRIDES="mscoree,mshtml="`，通常无需额外配置即可运行。
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-### Lparksi
-
-- 优化文档结构，保留核心功能、构建与使用说明
-- 持续维护文档可读性与项目信息准确性
+1. 克隆仓库：`git clone <repository-url> && cd skp2gltf`
+2. 创建并进入构建目录：`mkdir build && cd build`
+3. 配置并构建：
+   ```bash
+   cmake ..
+   cmake --build . --config Release
+   ```
+4. 运行：`skp2gltf.exe <input.skp> <output_dir> <output_name> [format]`
 
 ## 许可证
 
-本项目采用 GNU General Public License v3.0 (GPLv3) 许可证。
-
-### 主要条款
-
-- 自由使用：您可以自由地使用、修改和分发本软件。
-- 开源要求：任何基于本软件的衍生作品必须以相同的 GPLv3 许可证开源。
-- 专利授权：贡献者明确授予专利权利。
-- 声明要求：需要在显著位置说明对源代码的修改。
-- 复制保护：禁止添加额外限制，不得限制他人的 GPLv3 权利。
-
-完整许可证文本请参阅：[GNU GPLv3](https://www.gnu.org/licenses/gpl-3.0.html)
-
-注意：本项目仅推荐个人使用。
+本项目采用 **GNU General Public License v3.0 (GPLv3)** 许可证。
+衍生作品必须以相同的许可证开源。
 
 ## 致谢
 
 - [SketchUp SDK](https://extensions.sketchup.com/developers)
 - [Draco](https://github.com/google/draco)
 - [TinyGLTF](https://github.com/syoyo/tinygltf)
+- [Box64](https://github.com/ptitSeb/box64)
