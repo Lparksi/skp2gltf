@@ -40,7 +40,9 @@ void ParseMeshdata::getAllMeshes()
             std::vector<double> uvfloat;
             std::vector<size_t> indecShort;
             primitive.mode                        = iter_primitives->mode;
-            primitive.material                    = model->materials[iter_primitives->material];
+            if (iter_primitives->material >= 0 && (size_t)iter_primitives->material < model->materials.size()) {
+                primitive.material = model->materials[iter_primitives->material];
+            }
             int positionSize                      = 0;
             std::map<std::string, int> attributes = iter_primitives->attributes;
             if (attributes.find("POSITION") != attributes.end())

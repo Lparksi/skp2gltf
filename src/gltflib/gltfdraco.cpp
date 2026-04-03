@@ -37,8 +37,8 @@ int GltfDraco::initModel(bool useGZFile)
     bool ret = false;
     if (useGZFile)
     {
-        std::cout << "Reading gz-compressed glTF" << std::endl;
-        ret = gltfCtx.LoadASCIIFromGZFile(model, &err, &warn, inputFile.c_str());
+        std::cout << "GZ-compressed glTF not supported in this version" << std::endl;
+        return -1;
     }
     else
     {
@@ -65,9 +65,10 @@ int GltfDraco::initModel(bool useGZFile)
 
     if (!ret)
     {
-        std::cout << "Failed to parse glTF ,Application has stopped !!!" << std::endl;
+        std::cerr << "Failed to parse glTF: " << err << std::endl;
         return -1;
     }
+    return 0;
 }
 void GltfDraco::encode(int _speed, int _positionBit, int _texBit, int _normalBit, int _colorBit, int _genericBit)
 {
