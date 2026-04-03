@@ -3,5 +3,9 @@
 !Dockerfile
 !Dockerfile.alpine
 !entrypoint.sh
+!api.py
+!pyproject.toml
+!tests/
 !docker-bin/
 !docker-bin/*
+!Dockerfile.*
