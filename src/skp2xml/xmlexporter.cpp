@@ -20,6 +20,7 @@
 #include "xmltexturehelper.h"
 #include "xmlgeomutils.h"
 #include "utils.h"
+#include "gltflib/gltfdraco.h"
 
 
 #include <SketchUpAPI/import_export/pluginprogresscallback.h>
@@ -175,6 +176,7 @@ bool CXmlExporter::Convert(const std::string &src_file,
                            const std::string &file_path,
                            const std::string &file_name,
                            const std::string &output_format,
+                           bool use_draco,
                            SketchUpPluginProgressCallback *progress_callback)
 {
     bool exported = false;
@@ -208,7 +210,7 @@ bool CXmlExporter::Convert(const std::string &src_file,
         // 在导出到GLTF之前压缩纹理
         CompressAndResizeTextures();
         
-        exported = exportToGltfImpl(file_name, output_format) == 0;
+        exported = exportToGltfImpl(file_name, output_format, use_draco) == 0;
     }
     catch (...)
     {
@@ -521,7 +523,7 @@ void CXmlExporter::getComponentEntity(SUEntitiesRef entities, const SUTransforma
     }
 }
 
-int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::string &outputFormat) {
+int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::string &outputFormat, bool use_draco) {
     tinygltf::Model model;
     model.asset.version = "2.0";
     model.asset.generator = "zhuzhaoyun";
@@ -709,6 +711,20 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
                                         true,  // embedBuffers
                                         true,  // prettyPrint
                                         writeBinary);
+    
+    if (ret && use_draco) {
+        std::cout << "Starting Draco compression..." << std::endl;
+        gltf::GltfDraco dracoTool(&model);
+        // speed=10, bits: pos=11, tex=10, normal=8, color=8, generic=8
+        dracoTool.encode(10, 11, 10, 8, 8, 8);
+        
+        // Save again with Draco extension
+        ret = gltf.WriteGltfSceneToFile(&model, outputPath,
+                                          true,  // embedImages
+                                          true,  // embedBuffers
+                                          true,  // prettyPrint
+                                          writeBinary);
+    }
     
     return ret ? 0 : 1;
 }

@@ -68,7 +68,7 @@ int main(int argc, char **argv)
 {
     if (argc < 4)
     {
-        std::cerr << "Usage: skp2gltf.exe <input.skp> <output_dir> <output_name_or_path> [output_format:gltf|glb]" << std::endl;
+        std::cerr << "Usage: skp2gltf.exe <input.skp> <output_dir> <output_name_or_path> [output_format:gltf|glb] [draco:true|false]" << std::endl;
         return 2;
     }
 
@@ -76,17 +76,18 @@ int main(int argc, char **argv)
     std::string output_dir = argv[2];
     std::string output_arg = argv[3];
     std::string output_format = "glb";
+    bool use_draco = false;
 
-    if (argc >= 5)
-    {
-        output_format = ToLowerCopy(argv[4]);
-        if (output_format != "gltf" && output_format != "glb")
-        {
-            std::cerr << "Invalid output format: " << argv[4] << ". Supported formats: gltf, glb" << std::endl;
-            return 2;
+    // 遍历剩余参数寻找 draco 或格式
+    for (int i = 4; i < argc; ++i) {
+        std::string arg = ToLowerCopy(argv[i]);
+        if (arg == "draco" || arg == "true" || arg == "--draco") {
+            use_draco = true;
+        } else if (arg == "gltf" || arg == "glb") {
+            output_format = arg;
         }
     }
-    else
+    if (argc < 5)
     {
         if (EndsWithIgnoreCase(output_arg, ".gltf"))
         {
@@ -123,7 +124,7 @@ int main(int argc, char **argv)
     // C:\model\allRvtFile\skp\67beca5e7d1b0078ee8c7fee.skp 
     // C:\model\model\skp\67beca5e7d1b0078ee8c7fee\ 
     // C:\model\model\skp\67beca5e7d1b0078ee8c7fee
-    const bool ok = cXmlExporter.Convert(skp_file, output_dir, gltf_file, output_format, nullptr);
+    const bool ok = cXmlExporter.Convert(skp_file, output_dir, gltf_file, output_format, use_draco, nullptr);
     if (ok)
     {
         std::cout << "finished" << std::endl;
