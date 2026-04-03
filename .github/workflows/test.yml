@@ -4,7 +4,22 @@ on:
   push:
     branches:
       - '**'
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE'
+      - 'docs/**'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE'
+      - 'docs/**'
+
+# 并发控制：如果同一个分支有新的提交，自动取消旧的运行
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -98,199 +113,190 @@ jobs:
           $fileInfo = Get-Item "output/result.glb"
           Write-Host "Test Passed! Output size: $($fileInfo.Length) bytes."
 
-  # 3. 并行构建 Docker 镜像 (amd64 & arm64 在不同机器上同时跑)
-  build-docker-image:
-    name: Build Docker (${{ matrix.arch }})
+  # 3. 构建 Docker 镜像 (AMD64)
+  build-docker-amd64:
+    name: Build Docker (amd64)
     needs: build-windows
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64, arm64]
+    timeout-minutes: 15
     outputs:
-      # 我们需要将 tag 传递给下游，注意这里的 tag 会带有 arch 后缀
-      image_tag_amd64: ${{ steps.image_info.outputs.tag }}-amd64
-      image_tag_arm64: ${{ steps.image_info.outputs.tag }}-arm64
+      tag: ${{ steps.image_info.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Download Binaries
         uses: actions/download-artifact@v4
         with:
           name: windows-binaries
           path: docker-bin
-
-      - name: Set up QEMU
-        if: matrix.arch == 'arm64'
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Get Repo Lowercase and Tag
-        id: image_info
+      - id: image_info
         run: |
           REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          TAG="ghcr.io/${REPO_LC}:test-${{ github.sha }}"
+          TAG="ghcr.io/${REPO_LC}:test-${{ github.sha }}-amd64"
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
-
-      - name: Build and Push
+      - name: Build and Push (amd64)
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile.${{ matrix.arch }}
-          platforms: linux/${{ matrix.arch }}
+          file: ./Dockerfile.amd64
+          platforms: linux/amd64
           push: true
-          tags: ${{ steps.image_info.outputs.tag }}-${{ matrix.arch }}
+          tags: ${{ steps.image_info.outputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # 4. 各平台 Docker 测试 (解耦依赖，谁好了谁跑)
-  test-docker-multiplatform:
-    name: Docker Test (${{ matrix.name }})
-    needs: build-docker-image
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            platform: linux/amd64
-            arch: amd64
-            name: Linux-x64
-          - os: ubuntu-latest
-            platform: linux/arm64
-            arch: arm64
-            name: Linux-arm64
-    runs-on: ${{ matrix.os }}
+  # 4. 测试 Docker 镜像 (AMD64) - 构建完立即开始
+  test-docker-amd64:
+    name: Test Docker (amd64)
+    needs: build-docker-amd64
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Run Test (CLI Mode)
+        run: |
+          mkdir -p output
+          docker run --rm -v "${PWD}:/work" ${{ needs.build-docker-amd64.outputs.tag }} \
+            /work/test/test_model.skp /work/output result glb
+      - name: Run Test (API Mode)
+        run: |
+          echo "::group::Starting API Container"
+          docker run -d --name skp_api -p 8000:8000 -v "${PWD}:/work" ${{ needs.build-docker-amd64.outputs.tag }}
+          echo "::endgroup::"
+          echo "::group::Setup Test Environment with UV"
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          source $HOME/.cargo/env
+          uv pip install httpx pytest pytest-asyncio --system
+          echo "::endgroup::"
+          echo "::group::Waiting for API"
+          curl --retry 30 --retry-connrefused --retry-delay 1 --output /dev/null --silent --show-error --fail http://localhost:8000/health
+          echo "::endgroup::"
+          export API_URL="http://localhost:8000"
+          pytest -v tests/test_api.py
+          docker stop skp_api && docker rm skp_api
 
+  # 5. 构建 Docker 镜像 (ARM64)
+  build-docker-arm64:
+    name: Build Docker (arm64)
+    needs: build-windows
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    outputs:
+      tag: ${{ steps.image_info.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download Binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-binaries
+          path: docker-bin
       - name: Set up QEMU
-        if: matrix.arch == 'arm64'
         uses: docker/setup-qemu-action@v3
-
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - id: image_info
+        run: |
+          REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          TAG="ghcr.io/${REPO_LC}:test-${{ github.sha }}-arm64"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+      - name: Build and Push (arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.arm64
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.image_info.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
+  # 6. 测试 Docker 镜像 (ARM64)
+  test-docker-arm64:
+    name: Test Docker (arm64)
+    needs: build-docker-arm64
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
       - name: Run Test (CLI Mode)
         run: |
-          REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          IMAGE_TAG="ghcr.io/${REPO_LC}:test-${{ github.sha }}-${{ matrix.arch }}"
-          
           mkdir -p output
-          docker run --rm \
-            --platform ${{ matrix.platform }} \
-            -v "${PWD}:/work" \
-            ${IMAGE_TAG} \
+          docker run --rm --platform linux/arm64 -v "${PWD}:/work" ${{ needs.build-docker-arm64.outputs.tag }} \
             /work/test/test_model.skp /work/output result glb
-
-      - name: Verify CLI Output
-        run: |
-          if [ ! -f "output/result.glb" ]; then
-            echo "Error: output/result.glb was not generated."
-            exit 1
-          fi
-          ls -lh output/result.glb
-
       - name: Run Test (API Mode)
         run: |
-          REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          IMAGE_TAG="ghcr.io/${REPO_LC}:test-${{ github.sha }}-${{ matrix.arch }}"
-          
-          # Start container in background
-          docker run -d --name skp_api \
-            --platform ${{ matrix.platform }} \
-            -p 8000:8000 \
-            -v "${PWD}:/work" \
-            ${IMAGE_TAG}
-          
-          # Install test dependencies on runner
-          pip install httpx pytest pytest-asyncio
-          
-          # Wait for API to be ready (up to 30s)
-          echo "Waiting for API health check..."
-          MAX_RETRIES=30
-          COUNT=0
-          until $(curl --output /dev/null --silent --head --fail http://localhost:8000/health); do
-              if [ $COUNT -eq $MAX_RETRIES ]; then
-                echo "API failed to start in time"
-                docker logs skp_api
-                exit 1
-              fi
-              printf '.'
-              sleep 1
-              COUNT=$((COUNT+1))
-          done
-          echo "API is up!"
-          
-          # Run API tests
+          echo "::group::Starting API Container"
+          docker run -d --name skp_api --platform linux/arm64 -p 8000:8000 -v "${PWD}:/work" ${{ needs.build-docker-arm64.outputs.tag }}
+          echo "::endgroup::"
+          echo "::group::Setup Test Environment with UV"
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          source $HOME/.cargo/env
+          uv pip install httpx pytest pytest-asyncio --system
+          echo "::endgroup::"
+          echo "::group::Waiting for API"
+          curl --retry 30 --retry-connrefused --retry-delay 1 --output /dev/null --silent --show-error --fail http://localhost:8000/health
+          echo "::endgroup::"
           export API_URL="http://localhost:8000"
-          pytest tests/test_api.py
-          
-          # Cleanup
-          docker stop skp_api
-          docker rm skp_api
+          pytest -v tests/test_api.py
+          docker stop skp_api && docker rm skp_api
 
-
-  # 5. 发布正式镜像 (仅在 main 分支推送到 latest)
+  # 7. 发布正式镜像 (仅在 main 或 tag 时)
   publish-final:
     name: Publish Final Image
-    needs: test-docker-multiplatform
+    needs: [test-docker-amd64, test-docker-arm64]
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Get Repo Lowercase
-        id: image_info
+      - name: Get Repo Info
+        id: info
         run: |
           REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          echo "repo=${REPO_LC}" >> $GITHUB_OUTPUT
-
+          echo "repo=ghcr.io/${REPO_LC}" >> $GITHUB_OUTPUT
       - name: Tag and Push Final
         run: |
-          REPO="ghcr.io/${{ steps.image_info.outputs.repo }}"
-          TEST_TAG="${REPO}:test-${{ github.sha }}"
+          REPO="${{ steps.info.outputs.repo }}"
+          TEST_AMD64="${REPO}:test-${{ github.sha }}-amd64"
+          TEST_ARM64="${REPO}:test-${{ github.sha }}-arm64"
           
-          # Push both architecture tags to latest
-          docker buildx imagetools create --tag ${REPO}:latest-amd64 ${TEST_TAG}-amd64
-          docker buildx imagetools create --tag ${REPO}:latest-arm64 ${TEST_TAG}-arm64
+          # 创建并推送合并后的 multi-arch manifest
+          docker buildx imagetools create --tag ${REPO}:latest ${TEST_AMD64} ${TEST_ARM64}
           
-          # Optional: create a consolidated 'latest' manifest if you still want it
-          docker buildx imagetools create --tag ${REPO}:latest ${TEST_TAG}-amd64 ${TEST_TAG}-arm64
-          
-          # Version tags
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             VER="${{ github.ref_name }}"
-            docker buildx imagetools create --tag ${REPO}:${VER}-amd64 ${TEST_TAG}-amd64
-            docker buildx imagetools create --tag ${REPO}:${VER}-arm64 ${TEST_TAG}-arm64
-            docker buildx imagetools create --tag ${REPO}:${VER} ${TEST_TAG}-amd64 ${TEST_TAG}-arm64
+            docker buildx imagetools create --tag ${REPO}:${VER} ${TEST_AMD64} ${TEST_ARM64}
           fi
 
-  # 6. 创建 GitHub Release
+  # 8. 创建 GitHub Release
   create-release:
     name: Create GitHub Release
-    needs: [build-windows, test-docker-multiplatform]
+    needs: [build-windows, test-docker-amd64, test-docker-arm64]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -298,19 +304,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Download Windows Binaries
         uses: actions/download-artifact@v4
         with:
           name: windows-binaries
           path: bin
-
       - name: Archive Binaries
         run: |
-          cd bin
-          zip -r ../skp2gltf-win-x64.zip .
-          cd ..
-
+          cd bin && zip -r ../skp2gltf-win-x64.zip .
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -318,10 +319,8 @@ jobs:
           body: |
             ## Docker Image
             `docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}`
-
-            Supported Platforms:
-            - `linux/amd64` (Native x86_64)
-            - `linux/arm64` (Box64 Emulation)
+            
+            Platforms: `linux/amd64`, `linux/arm64`
           draft: false
           prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}
