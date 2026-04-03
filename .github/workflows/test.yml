@@ -19,6 +19,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Cache CMake Build
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: ${{ runner.os }}-cmake-${{ hashFiles('**/CMakeLists.txt') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-cmake-${{ hashFiles('**/CMakeLists.txt') }}-
+            ${{ runner.os }}-cmake-
+
       - name: Configure (CMake)
         run: cmake -S . -B build -A x64 -DCMAKE_BUILD_TYPE=Release
 
@@ -133,6 +142,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.image_info.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   # 4. 各平台 Docker 测试
   test-docker-multiplatform:
@@ -190,4 +201,43 @@ jobs:
             exit 1
           fi
           ls -lh output/result.glb
+
+  # 5. 发布正式镜像 (仅在 main 分支推送到 latest)
+  publish-final:
+    name: Publish Final Image
+    needs: test-docker-multiplatform
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get Repo Lowercase
+        id: image_info
+        run: |
+          REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "repo=${REPO_LC}" >> $GITHUB_OUTPUT
+
+      - name: Tag and Push Final
+        run: |
+          TEST_TAG="${{ needs.build-docker-image.outputs.image_tag }}"
+          FINAL_TAG="ghcr.io/${{ steps.image_info.outputs.repo }}:latest"
+          
+          # Pull the multi-platform image manifest and re-tag
+          docker buildx imagetools create \
+            --tag ${FINAL_TAG} \
+            ${TEST_TAG}
+          
+          # If it's a version tag, also push it
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION_TAG="ghcr.io/${{ steps.image_info.outputs.repo }}:${{ github.ref_name }}"
+            docker buildx imagetools create --tag ${VERSION_TAG} ${TEST_TAG}
+          fi
 
