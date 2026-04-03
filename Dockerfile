@@ -15,19 +15,24 @@ RUN apt-get update && \
         wget \
         gnupg2 \
         xvfb \
+        xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Add Box86/Box64 repository (Maintained by the community for ARM64 Debian/Raspbian)
-# This repo provides architecture-aware Wine builds that work perfectly with Box64.
+# Setup Box64 and Wine based on architecture
 RUN if [ "$(uname -m)" = "aarch64" ]; then \
-        wget https://itai-nelken.github.io/weekly-box86-repro/debian/box86.list -O /etc/apt/sources.list.d/box86.list && \
-        wget -qO- https://itai-nelken.github.io/weekly-box86-repro/debian/pub.gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/box86-repo-gpg.gpg && \
-        apt-get update && \
-        apt-get install -y box64-android wine-64bit-amd64 && \
-        # Create a symlink for consistency
-        ln -s /usr/local/bin/box64 /usr/bin/box64 || true; \
+        # 1. Install Box64 via ryanfortner's repo (The standard for ARM64)
+        wget -qO- https://ryanfortner.github.io/box64-debs/KEY.gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/box64-debs-archive-keyring.gpg && \
+        echo "deb [arch=arm64] https://ryanfortner.github.io/box64-debs/ ./" > /etc/apt/sources.list.d/box64-debs.list && \
+        apt-get update && apt-get install -y box64 && \
+        # 2. Extract Kron4ek's Portable Wine (amd64) to /opt/wine-stable
+        # This version is standalone and avoided apt dependency hell on ARM64
+        mkdir -p /opt/wine-stable && \
+        curl -SL https://github.com/Kron4ek/Wine-Builds/releases/download/9.0/wine-9.0-amd64.tar.xz | tar -xJ -C /opt/wine-stable --strip-components=1 && \
+        ln -s /opt/wine-stable/bin/wine64 /usr/local/bin/wine64 && \
+        ln -s /opt/wine-stable/bin/wine /usr/local/bin/wine; \
     else \
-        # Standard x86_64 path
+    # Standard x86_64 path (Requires i386 for Wine)
+        dpkg --add-architecture i386 && \
         mkdir -pm755 /etc/apt/keyrings && \
         curl -fsSL https://dl.winehq.org/wine-builds/winehq.key | gpg --dearmor -o /etc/apt/keyrings/winehq-archive.key && \
         curl -fsSL https://dl.winehq.org/wine-builds/debian/dists/bookworm/winehq-bookworm.sources -o /etc/apt/sources.list.d/winehq-bookworm.sources && \
