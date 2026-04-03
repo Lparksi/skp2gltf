@@ -182,10 +182,21 @@ jobs:
           uv pip install httpx pytest pytest-asyncio
           echo "::endgroup::"
           echo "::group::Waiting for API"
-          curl --retry 30 --retry-connrefused --retry-delay 1 --output /dev/null --silent --show-error --fail http://localhost:8000/health
+          # Manually loop to handle code 56/7 etc.
+          MAX_RETRIES=45
+          COUNT=0
+          until curl --output /dev/null --silent --show-error --fail http://localhost:8000/health; do
+            COUNT=$((COUNT+1))
+            if [ $COUNT -ge $MAX_RETRIES ]; then
+              echo "API failed to become ready after $MAX_RETRIES attempts"
+              docker logs skp_api
+              exit 1
+            fi
+            sleep 2
+          done
           echo "::endgroup::"
           export API_URL="http://localhost:8000"
-          pytest -v tests/test_api.py
+          uv run pytest -v -o asyncio_mode=auto tests/test_api.py || (docker logs skp_api && exit 1)
           docker stop skp_api && docker rm skp_api
 
   # 5. 构建 Docker 镜像 (ARM64)
@@ -261,10 +272,21 @@ jobs:
           uv pip install httpx pytest pytest-asyncio
           echo "::endgroup::"
           echo "::group::Waiting for API"
-          curl --retry 30 --retry-connrefused --retry-delay 1 --output /dev/null --silent --show-error --fail http://localhost:8000/health
+          # Manually loop to handle code 56/7 etc.
+          MAX_RETRIES=45
+          COUNT=0
+          until curl --output /dev/null --silent --show-error --fail http://localhost:8000/health; do
+            COUNT=$((COUNT+1))
+            if [ $COUNT -ge $MAX_RETRIES ]; then
+              echo "API failed to become ready after $MAX_RETRIES attempts"
+              docker logs skp_api
+              exit 1
+            fi
+            sleep 2
+          done
           echo "::endgroup::"
           export API_URL="http://localhost:8000"
-          pytest -v tests/test_api.py
+          uv run pytest -v -o asyncio_mode=auto tests/test_api.py || (docker logs skp_api && exit 1)
           docker stop skp_api && docker rm skp_api
 
   # 7. 发布正式镜像 (仅在 main 或 tag 时)

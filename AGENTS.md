@@ -17,6 +17,27 @@
 !new_directory/
 ```
 
+### 2. Pytest 9.0+ 与 pytest-asyncio 模式
+**错误描述**：在 Pytest 9.0+ 环境下，如果未在 `pyproject.toml` 中配置 `asyncio_mode`，异步测试（async tests）和异步 fixtures 会因为模式冲突导致警告被视为错误，或者根本无法执行。
+
+**解决方案**：
+确保在 `pyproject.toml` 中包含以下配置：
+```toml
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+```
+
+### 3. GitHub Runner 上的 PEP 668 限制
+**错误描述**：在 `ubuntu-latest` 等 GitHub Runner 上，系统 Python 被标记为“外部管理”（PEP 668）。直接尝试 `uv pip install --system` 会报错。
+
+**解决方案**：
+推荐使用 `astral-sh/setup-uv@v5` 配合 `python-version: '3.12'`。它会创建一个受管的独立环境，绕过系统限制并支持缓存。
+不要在 Runner 上使用系统级 Python 安装测试依赖。
+
+### 4. 禁止自动 Git 提交
+**规则要求**：除非用户在对话中明确发出提交（commit）请求，否则 AI 助手禁止执行 `git commit` 或 `git push` 命令。即使修复了代码，也应由用户手动执行或在明确指令下代为执行。
+
 ## 🛠 开发指南 (Development Guide)
 
 ### 环境说明
