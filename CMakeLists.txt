@@ -43,6 +43,12 @@ set(DRACO_MESH_COMPRESSION ON CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(draco)
 
+# 修复 Draco target 的包含路径，确保生成的 draco_features.h 能被找到
+target_include_directories(draco INTERFACE 
+    $<BUILD_INTERFACE:${draco_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${draco_BINARY_DIR}>
+)
+
 include_directories(
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/include/exportgltf

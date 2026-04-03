@@ -161,7 +161,7 @@ void ParseGltfCommon::getAllMeshes()
             if (iter_primitives->material >= 0 && (size_t)iter_primitives->material < model.materials.size()) {
                 primitive.material = model.materials[iter_primitives->material];
             }
-            int positionSize                      = 0;
+            size_t positionSize                      = 0;
             std::map<std::string, int> attributes = iter_primitives->attributes;
             if (attributes.find("POSITION") != attributes.end())
             {
@@ -178,7 +178,6 @@ void ParseGltfCommon::getAllMeshes()
                 size_t end                           = start + model.accessors[position].count * byteStride;
                 std::vector<uchar> &bufferViewers = allBufferViewers[bufferViewerIndex];
                 std::vector<uchar> bufferViewer(bufferViewers.begin() + start, bufferViewers.begin() + end);
-                size_t positionSize = 0;
                 for (size_t i = 0; i < bufferViewer.size(); i += byteStride)
                 {
                     for (size_t j = 0; j < typeSize; ++j)

@@ -14,8 +14,3 @@ target_include_directories(gltflib PUBLIC
 target_link_libraries(gltflib PUBLIC
     draco
 )
-
-target_include_directories(gltflib PUBLIC
-    ${draco_SOURCE_DIR}/src
-    ${draco_BINARY_DIR}
-)
