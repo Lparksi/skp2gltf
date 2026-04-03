@@ -50,9 +50,9 @@ void ParseMeshdata::getAllMeshes()
                 int position          = attributes["POSITION"];
                 int bufferViewerIndex = model->accessors[position].bufferView;
                 size_t componentType  = model->accessors[position].componentType;
-                int byteLength        = tinygltf::GetComponentSizeInBytes(componentType);
+                int byteLength        = tinygltf::GetComponentSizeInBytes(static_cast<int>(componentType));
                 size_t type           = model->accessors[position].type;
-                size_t typeSize       = tinygltf::GetNumComponentsInType(type);
+                size_t typeSize       = tinygltf::GetNumComponentsInType(static_cast<int>(type));
                 size_t byteStride =
                     model->bufferViews[bufferViewerIndex].byteStride == 0 ? typeSize * byteLength : model->bufferViews[bufferViewerIndex].byteStride;
                 size_t start                         = model->accessors[position].byteOffset;
@@ -84,9 +84,9 @@ void ParseMeshdata::getAllMeshes()
                 int color          = attributes["COLOR_0"];
                 int bufferViewerIndex = model->accessors[color].bufferView;
                 size_t componentType  = model->accessors[color].componentType;
-                int byteLength        = tinygltf::GetComponentSizeInBytes(componentType);
+                int byteLength        = tinygltf::GetComponentSizeInBytes(static_cast<int>(componentType));
                 size_t type           = model->accessors[color].type;
-                size_t typeSize       = tinygltf::GetNumComponentsInType(type);
+                size_t typeSize       = tinygltf::GetNumComponentsInType(static_cast<int>(type));
                 size_t byteStride =
                     model->bufferViews[bufferViewerIndex].byteStride == 0 ? typeSize * byteLength : model->bufferViews[bufferViewerIndex].byteStride;
                 size_t start                         = model->accessors[color].byteOffset;
@@ -118,9 +118,9 @@ void ParseMeshdata::getAllMeshes()
                 int normal            = attributes["NORMAL"];
                 int bufferViewerIndex = model->accessors[normal].bufferView;
                 size_t componentType  = model->accessors[normal].componentType;
-                int byteLength        = tinygltf::GetComponentSizeInBytes(componentType);
+                int byteLength        = tinygltf::GetComponentSizeInBytes(static_cast<int>(componentType));
                 size_t type           = model->accessors[normal].type;
-                size_t typeSize       = tinygltf::GetNumComponentsInType(type);
+                size_t typeSize       = tinygltf::GetNumComponentsInType(static_cast<int>(type));
                 size_t byteStride =
                     model->bufferViews[bufferViewerIndex].byteStride == 0 ? typeSize * byteLength : model->bufferViews[bufferViewerIndex].byteStride;
                 size_t start                         = model->accessors[normal].byteOffset;
@@ -152,9 +152,9 @@ void ParseMeshdata::getAllMeshes()
                 int normal            = attributes["TEXCOORD_0"];
                 int bufferViewerIndex = model->accessors[normal].bufferView;
                 size_t componentType  = model->accessors[normal].componentType;
-                int byteLength        = tinygltf::GetComponentSizeInBytes(componentType);
+                int byteLength        = tinygltf::GetComponentSizeInBytes(static_cast<int>(componentType));
                 size_t type             = model->accessors[normal].type;
-                size_t typeSize         = tinygltf::GetNumComponentsInType(type);
+                size_t typeSize         = tinygltf::GetNumComponentsInType(static_cast<int>(type));
                 size_t byteStride =
                     model->bufferViews[bufferViewerIndex].byteStride == 0 ? typeSize * byteLength : model->bufferViews[bufferViewerIndex].byteStride;
                 size_t start                         = model->accessors[normal].byteOffset;
