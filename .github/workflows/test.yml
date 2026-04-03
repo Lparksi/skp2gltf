@@ -4,17 +4,15 @@ on:
   push:
     branches:
       - '**'
-    paths-ignore:
-      - '**.md'
-      - '.gitignore'
-      - 'LICENSE'
-      - 'docs/**'
+    tags:
+      - 'v*'
   pull_request:
     paths-ignore:
       - '**.md'
       - '.gitignore'
       - 'LICENSE'
       - 'docs/**'
+  workflow_dispatch:
 
 # 并发控制：如果同一个分支有新的提交，自动取消旧的运行
 concurrency:
