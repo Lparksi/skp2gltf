@@ -86,7 +86,7 @@ target_link_libraries(skp2gltf PRIVATE
     gltflib
     skp2xml
     tinyxml2
-    draco_static # 使用 FetchContent 生成的 target
+    draco # 使用 FetchContent 生成的 target
     ${CMAKE_SOURCE_DIR}/lib/SketchUpAPI.lib
     ${CMAKE_SOURCE_DIR}/lib/sketchup.lib
 )

@@ -12,5 +12,5 @@ target_include_directories(gltflib PUBLIC
 )
 
 target_link_libraries(gltflib PRIVATE
-    draco_static
+    draco
 )
