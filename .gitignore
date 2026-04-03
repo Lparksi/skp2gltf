@@ -2,3 +2,4 @@ build/
 gltf_analyzer.py
 .vscode/*
 .vs/
+.DS_Store
