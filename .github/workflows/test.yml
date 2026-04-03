@@ -164,27 +164,18 @@ jobs:
             platform: linux/amd64
             arch: amd64
             name: Linux-x64
-          - os: macos-13
-            platform: linux/amd64
-            arch: amd64
-            name: MacOS-x64
-          - os: macos-14
+          - os: ubuntu-latest
             platform: linux/arm64
             arch: arm64
-            name: MacOS-arm64
-          - os: macos-latest
-            platform: linux/arm64
-            arch: arm64
-            name: MacOS-latest-arm64
+            name: Linux-arm64
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Docker (macOS only)
-        if: runner.os == 'macOS'
-        uses: docker-practice/actions-setup-docker@v1
-        timeout-minutes: 20
+      - name: Set up QEMU
+        if: matrix.arch == 'arm64'
+        uses: docker/setup-qemu-action@v3
 
       - name: Login to GHCR
         uses: docker/login-action@v3
