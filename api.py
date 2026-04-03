@@ -20,6 +20,7 @@ class ConvertRequest(BaseModel):
     output_dir: Optional[str] = "/work/output"
     output_name: Optional[str] = None
     format: Optional[str] = "glb"
+    draco: Optional[bool] = False
 
 def cleanup_tmp(path: str):
     if os.path.exists(path):
@@ -29,7 +30,7 @@ def cleanup_tmp(path: str):
             os.remove(path)
         logger.info(f"Cleaned up {path}")
 
-async def run_conversion(input_path: str, output_dir: str, output_name: str, format: str):
+async def run_conversion(input_path: str, output_dir: str, output_name: str, format: str, draco: bool = False):
     """Executes the skp2gltf.exe via Wine"""
     arch = os.uname().machine
     is_arm64 = arch in ["aarch64", "arm64"]
@@ -47,6 +48,8 @@ async def run_conversion(input_path: str, output_dir: str, output_name: str, for
         exe_path = os.getenv("SKP2GLTF_EXE", "/app/skp2gltf.exe")
 
     cmd += [wine_bin, exe_path, input_path, output_dir, output_name, format]
+    if draco:
+        cmd.append("draco")
     
     logger.info(f"Executing: {' '.join(cmd)}")
     
@@ -85,7 +88,8 @@ async def health():
 async def convert_upload(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...), 
-    format: str = "glb"
+    format: str = "glb",
+    draco: bool = False
 ):
     if not file.filename.lower().endswith(".skp"):
         raise HTTPException(status_code=400, detail="Only .skp files supported")
@@ -103,7 +107,7 @@ async def convert_upload(
             shutil.copyfileobj(file.file, buffer)
         
         async with lock:
-            ok, msg = await run_conversion(input_path, tmp_dir, output_name, format)
+            ok, msg = await run_conversion(input_path, tmp_dir, output_name, format, draco)
             if not ok:
                 raise HTTPException(status_code=500, detail=f"Conversion failed: {msg}")
 
@@ -127,7 +131,7 @@ async def convert_path(req: ConvertRequest):
     os.makedirs(req.output_dir, exist_ok=True)
 
     async with lock:
-        ok, msg = await run_conversion(req.input_path, req.output_dir, out_name, req.format)
+        ok, msg = await run_conversion(req.input_path, req.output_dir, out_name, req.format, req.draco)
         if not ok:
              raise HTTPException(status_code=500, detail=f"Conversion failed: {msg}")
 

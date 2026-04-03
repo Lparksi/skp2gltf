@@ -112,6 +112,7 @@ class CXmlExporter
                  const std::string &file_name,
                  const std::string &to_file,
                  const std::string &output_format,
+                 bool use_draco,
                  SketchUpPluginProgressCallback *callback);
 
     // Set user options
@@ -120,7 +121,7 @@ class CXmlExporter
     // Get stats
     const CXmlExportStats &stats() const { return stats_; }
 
-    int exportToGltfImpl(const std::string &gltfName, const std::string &outputFormat);
+    int exportToGltfImpl(const std::string &gltfName, const std::string &outputFormat, bool use_draco);
     void addFace(SUEntitiesRef entities, const SUTransformation &transformation);
     void getComponentEntity(SUEntitiesRef entities, const SUTransformation &transformation);
 

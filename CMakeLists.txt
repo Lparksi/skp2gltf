@@ -8,10 +8,13 @@ endif()
 
 # 根据编译类型设置编译选项
 if(MSVC)
-    # Debug 配置
-    set(CMAKE_CXX_FLAGS_DEBUG "/MTd /Zi /Ob0 /Od /RTC1")
-    # Release 配置
-    set(CMAKE_CXX_FLAGS_RELEASE "/MT /O2 /Ob2 /DNDEBUG")
+    # 增加安全警告忽略
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+    
+    # Debug 配置使用 /MDd (Dynamic Debug)
+    set(CMAKE_CXX_FLAGS_DEBUG "/MDd /Zi /Ob0 /Od /RTC1")
+    # Release 配置使用 /MD (Dynamic Release)
+    set(CMAKE_CXX_FLAGS_RELEASE "/MD /O2 /Ob2 /DNDEBUG")
 endif()
 
 set(CMAKE_CXX_STANDARD 14)
@@ -24,6 +27,29 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 # 包含 SketchUp SDK 配置
 include(sketchup-sdk)
 
+# 自动从官方 GitHub 下载并集成 Draco
+include(FetchContent)
+FetchContent_Declare(
+    draco
+    GIT_REPOSITORY https://github.com/google/draco.git
+    GIT_TAG        1.5.7  # 使用稳定的 1.5.7 版本
+)
+
+# 配置 Draco 编译选项，仅编译核心库以节省时间
+set(DRACO_INSTALL OFF CACHE BOOL "" FORCE)
+set(DRACO_JS_GLUE OFF CACHE BOOL "" FORCE)
+set(DRACO_ANIMATION ON CACHE BOOL "" FORCE)
+set(DRACO_MESH_COMPRESSION ON CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(draco)
+
+# Explicitly add the necessary include directories to the `draco` target
+# so they are properly propagated to any target that links against it.
+target_include_directories(draco INTERFACE 
+    ${draco_SOURCE_DIR}/src
+    ${CMAKE_BINARY_DIR}
+)
+
 include_directories(
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/include/exportgltf
@@ -31,7 +57,6 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/include/skp2xml
 
     ${PROJECT_SOURCE_DIR}/thirdparty
-    ${PROJECT_SOURCE_DIR}/thirdparty/draco
     ${PROJECT_SOURCE_DIR}/thirdparty/pugixml
     ${PROJECT_SOURCE_DIR}/thirdparty/nlohmann
     ${PROJECT_SOURCE_DIR}/thirdparty/rapidjson
@@ -40,6 +65,8 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/thirdparty/rapidxml
     ${PROJECT_SOURCE_DIR}/thirdparty/tinyxml2
     ${PROJECT_SOURCE_DIR}/thirdparty/xml2json
+    ${draco_SOURCE_DIR}/src
+    ${CMAKE_BINARY_DIR}
 )
 
 # 添加子目录
@@ -67,9 +94,9 @@ target_link_libraries(skp2gltf PRIVATE
     gltflib
     skp2xml
     tinyxml2
+    draco # 使用 FetchContent 生成的 target
     ${CMAKE_SOURCE_DIR}/lib/SketchUpAPI.lib
     ${CMAKE_SOURCE_DIR}/lib/sketchup.lib
-    ${CMAKE_SOURCE_DIR}/lib/draco.lib
 )
 
 # 复制运行时依赖的 SKP_DLL 到输出目录

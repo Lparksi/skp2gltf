@@ -37,8 +37,8 @@ int GltfDraco::initModel(bool useGZFile)
     bool ret = false;
     if (useGZFile)
     {
-        std::cout << "Reading gz-compressed glTF" << std::endl;
-        ret = gltfCtx.LoadASCIIFromGZFile(model, &err, &warn, inputFile.c_str());
+        std::cout << "GZ-compressed glTF not supported in this version" << std::endl;
+        return -1;
     }
     else
     {
@@ -65,9 +65,10 @@ int GltfDraco::initModel(bool useGZFile)
 
     if (!ret)
     {
-        std::cout << "Failed to parse glTF ,Application has stopped !!!" << std::endl;
+        std::cerr << "Failed to parse glTF: " << err << std::endl;
         return -1;
     }
+    return 0;
 }
 void GltfDraco::encode(int _speed, int _positionBit, int _texBit, int _normalBit, int _colorBit, int _genericBit)
 {
@@ -140,9 +141,9 @@ void GltfDraco::dealMesh()
 
             bool use_identity_mapping = false;
             std::unique_ptr<Mesh> out_mesh(new Mesh());
-            out_mesh->SetNumFaces(iter_pris->indec.size() / 3);
-            Mesh *mesh                  = out_mesh.get();
-            PointCloud *out_point_cloud = static_cast<PointCloud *>(mesh);
+            out_mesh->SetNumFaces(static_cast<uint32_t>(iter_pris->indec.size() / 3));
+            Mesh *draco_mesh            = out_mesh.get();
+            PointCloud *out_point_cloud = static_cast<PointCloud *>(draco_mesh);
 
             int posAttId   = -1;
             int texAttId   = -1;
@@ -150,31 +151,31 @@ void GltfDraco::dealMesh()
             int colorAttId = -1;
             if (!iter_pris->position.empty())
             {
-                out_point_cloud->set_num_points(iter_pris->indec.size());
+                out_point_cloud->set_num_points(static_cast<uint32_t>(iter_pris->indec.size()));
                 GeometryAttribute va;
                 va.Init(GeometryAttribute::POSITION, nullptr, 3, DT_FLOAT32, false, sizeof(float) * 3, 0);
-                posAttId                 = out_point_cloud->AddAttribute(va, use_identity_mapping, iter_pris->position.size() / 3);
+                posAttId                 = out_point_cloud->AddAttribute(va, use_identity_mapping, static_cast<uint32_t>(iter_pris->position.size() / 3));
                 attributeMap["POSITION"] = tinygltf::Value(posAttId);
             }
             if (!iter_pris->normal.empty())
             {
                 GeometryAttribute va;
                 va.Init(GeometryAttribute::NORMAL, nullptr, 3, DT_FLOAT32, false, sizeof(float) * 3, 0);
-                normAttId              = out_point_cloud->AddAttribute(va, use_identity_mapping, iter_pris->normal.size() / 3);
+                normAttId              = out_point_cloud->AddAttribute(va, use_identity_mapping, static_cast<uint32_t>(iter_pris->normal.size() / 3));
                 attributeMap["NORMAL"] = tinygltf::Value(normAttId);
             }
             if (!iter_pris->color.empty())
             {
                 GeometryAttribute va;
                 va.Init(GeometryAttribute::COLOR, nullptr, 3, DT_FLOAT32, false, sizeof(float) * 3, 0);
-                colorAttId              = out_point_cloud->AddAttribute(va, use_identity_mapping, iter_pris->color.size() / 3);
+                colorAttId              = out_point_cloud->AddAttribute(va, use_identity_mapping, static_cast<uint32_t>(iter_pris->color.size() / 3));
                 attributeMap["COLOR_0"] = tinygltf::Value(colorAttId);
             }
             if (!iter_pris->uv.empty())
             {
                 GeometryAttribute va;
                 va.Init(GeometryAttribute::TEX_COORD, nullptr, 2, DT_FLOAT32, false, sizeof(float) * 2, 0);
-                texAttId                   = out_point_cloud->AddAttribute(va, use_identity_mapping, iter_pris->uv.size() / 2);
+                texAttId                   = out_point_cloud->AddAttribute(va, use_identity_mapping, static_cast<uint32_t>(iter_pris->uv.size() / 2));
                 attributeMap["TEXCOORD_0"] = tinygltf::Value(texAttId);
             }
 
@@ -182,7 +183,7 @@ void GltfDraco::dealMesh()
             if (posAttId >= 0)
             {
                 int numPosition = 0;
-                for (int i = 0; i < iter_pris->position.size(); i += 3)
+                for (size_t i = 0; i < iter_pris->position.size(); i += 3)
                 {
                     float val[3] = {(float)iter_pris->position[i], (float)iter_pris->position[i + 1], (float)iter_pris->position[i + 2]};
                     out_point_cloud->attribute(posAttId)->SetAttributeValue(AttributeValueIndex(numPosition++), val);
@@ -191,7 +192,7 @@ void GltfDraco::dealMesh()
             if (normAttId >= 0)
             {
                 int numNormal = 0;
-                for (int i = 0; i < iter_pris->normal.size(); i += 3)
+                for (size_t i = 0; i < iter_pris->normal.size(); i += 3)
                 {
                     float val[3] = {(float)iter_pris->normal[i], (float)iter_pris->normal[i + 1], (float)iter_pris->normal[i + 2]};
                     out_point_cloud->attribute(normAttId)->SetAttributeValue(AttributeValueIndex(numNormal++), val);
@@ -200,7 +201,7 @@ void GltfDraco::dealMesh()
             if (colorAttId >= 0)
             {
                 int numColor = 0;
-                for (int i = 0; i < iter_pris->color.size(); i += 3)
+                for (size_t i = 0; i < iter_pris->color.size(); i += 3)
                 {
                     float val[3] = {(float)iter_pris->color[i], (float)iter_pris->color[i + 1], (float)iter_pris->color[i + 2]};
                     out_point_cloud->attribute(colorAttId)->SetAttributeValue(AttributeValueIndex(numColor++), val);
@@ -209,14 +210,14 @@ void GltfDraco::dealMesh()
             if (texAttId >= 0)
             {
                 int numTex = 0;
-                for (int i = 0; i < iter_pris->uv.size(); i += 2)
+                for (size_t i = 0; i < iter_pris->uv.size(); i += 2)
                 {
                     float val[2] = {(float)iter_pris->uv[i], (float)iter_pris->uv[i + 1]};
                     out_point_cloud->attribute(texAttId)->SetAttributeValue(AttributeValueIndex(numTex++), val);
                 }
             }
 
-            for (int i = 0; i < iter_pris->indec.size(); ++i)
+            for (size_t i = 0; i < iter_pris->indec.size(); ++i)
             {
                 const PointIndex vertId(i);
                 if (posAttId >= 0)
