@@ -105,8 +105,8 @@ void ParseGltfCommon::getAllBufferViewers()
     allBufferViewers.clear();
     for (auto iter = model.bufferViews.begin(); iter != model.bufferViews.end(); ++iter)
     {
-        int start = iter->byteOffset;
-        int count = iter->byteLength;
+        size_t start = iter->byteOffset;
+        size_t count = iter->byteLength;
         std::vector<uchar> bufferViewer(model.buffers[iter->buffer].data.begin() + start, model.buffers[iter->buffer].data.begin() + start + count);
         allBufferViewers.emplace_back(bufferViewer);
     }
@@ -169,13 +169,13 @@ void ParseGltfCommon::getAllMeshes()
                 int bufferViewerIndex = model.accessors[position].bufferView;
                 int bufferIndex       = model.bufferViews[bufferViewerIndex].buffer;
                 size_t componentType  = model.accessors[position].componentType;
-                int byteLength        = tinygltf::GetComponentSizeInBytes(componentType);
+                int byteLength        = tinygltf::GetComponentSizeInBytes(static_cast<int>(componentType));
                 size_t type           = model.accessors[position].type;
-                size_t typeSize       = tinygltf::GetNumComponentsInType(type);
-                int byteStride =
+                size_t typeSize       = tinygltf::GetNumComponentsInType(static_cast<int>(type));
+                size_t byteStride =
                     model.bufferViews[bufferViewerIndex].byteStride == 0 ? typeSize * byteLength : model.bufferViews[bufferViewerIndex].byteStride;
-                int start                         = model.accessors[position].byteOffset;
-                int end                           = start + model.accessors[position].count * byteStride;
+                size_t start                         = model.accessors[position].byteOffset;
+                size_t end                           = start + model.accessors[position].count * byteStride;
                 std::vector<uchar> &bufferViewers = allBufferViewers[bufferViewerIndex];
                 std::vector<uchar> bufferViewer(bufferViewers.begin() + start, bufferViewers.begin() + end);
                 for (int i = 0; i < bufferViewer.size(); i += byteStride)
@@ -204,13 +204,13 @@ void ParseGltfCommon::getAllMeshes()
                 int bufferViewerIndex = model.accessors[normal].bufferView;
                 int bufferIndex       = model.bufferViews[bufferViewerIndex].buffer;
                 size_t componentType  = model.accessors[normal].componentType;
-                int byteLength        = tinygltf::GetComponentSizeInBytes(componentType);
+                int byteLength        = tinygltf::GetComponentSizeInBytes(static_cast<int>(componentType));
                 size_t type           = model.accessors[normal].type;
-                size_t typeSize       = tinygltf::GetNumComponentsInType(type);
-                int byteStride =
+                size_t typeSize       = tinygltf::GetNumComponentsInType(static_cast<int>(type));
+                size_t byteStride =
                     model.bufferViews[bufferViewerIndex].byteStride == 0 ? typeSize * byteLength : model.bufferViews[bufferViewerIndex].byteStride;
-                int start                         = model.accessors[normal].byteOffset;
-                int end                           = start + model.accessors[normal].count * byteStride;
+                size_t start                         = model.accessors[normal].byteOffset;
+                size_t end                           = start + model.accessors[normal].count * byteStride;
                 std::vector<uchar> &bufferViewers = allBufferViewers[bufferViewerIndex];
                 std::vector<uchar> bufferViewer(bufferViewers.begin() + start, bufferViewers.begin() + end);
                 for (int i = 0; i < bufferViewer.size();)
@@ -238,14 +238,14 @@ void ParseGltfCommon::getAllMeshes()
                 int normal            = attributes["TEXCOORD_0"];
                 int bufferViewerIndex = model.accessors[normal].bufferView;
                 int bufferIndex       = model.bufferViews[bufferViewerIndex].buffer;
-                uint componentType    = model.accessors[normal].componentType;
-                int byteLength        = tinygltf::GetComponentSizeInBytes(componentType);
-                uint type             = model.accessors[normal].type;
-                uint typeSize         = tinygltf::GetNumComponentsInType(type);
-                int byteStride =
+                size_t componentType  = model.accessors[normal].componentType;
+                int byteLength        = tinygltf::GetComponentSizeInBytes(static_cast<int>(componentType));
+                size_t type             = model.accessors[normal].type;
+                size_t typeSize         = tinygltf::GetNumComponentsInType(static_cast<int>(type));
+                size_t byteStride =
                     model.bufferViews[bufferViewerIndex].byteStride == 0 ? typeSize * byteLength : model.bufferViews[bufferViewerIndex].byteStride;
-                int start                         = model.accessors[normal].byteOffset;
-                int end                           = start + model.accessors[normal].count * byteStride;
+                size_t start                         = model.accessors[normal].byteOffset;
+                size_t end                           = start + model.accessors[normal].count * byteStride;
                 std::vector<uchar> &bufferViewers = allBufferViewers[bufferViewerIndex];
                 std::vector<uchar> bufferViewer(bufferViewers.begin() + start, bufferViewers.begin() + end);
                 for (int i = 0; i < bufferViewer.size();)
@@ -436,8 +436,8 @@ void ParseGltfCommon::getGlobalBox()
  */
 std::string ParseGltfCommon::getFileName(const std::string &fileName)
 {
-    int start = 0;
-    int end   = 0;
+    size_t start = 0;
+    size_t end   = 0;
     if (fileName.find_last_of(".") != std::string::npos)
     {
         end = fileName.find_last_of(".");

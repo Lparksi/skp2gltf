@@ -221,7 +221,7 @@ void CreateGltfCommon::createAccessors()
                 indecAcc.minValues     = std::vector<double>{(double)*min_element(iter_pri->indec.begin(), iter_pri->indec.end())};
                 indecAcc.type          = TINYGLTF_TYPE_SCALAR;
                 model.accessors.emplace_back(indecAcc);
-                indecOffeset += iter_pri->indec.size() * 4;
+                indecOffeset += static_cast<int>(iter_pri->indec.size() * 4);
                 std::vector<uchar> indecBuffer;
                 convertTogltf::AccessorsDataS2Unint dataIndec;
                 dataIndec.accessorsData = iter_pri->indec;
@@ -239,7 +239,7 @@ void CreateGltfCommon::createAccessors()
                 positionAcc.type          = TINYGLTF_TYPE_VEC3;
                 findMinAndMaxVec(positionAcc.minValues, positionAcc.maxValues, iter_pri->position);
                 model.accessors.emplace_back(positionAcc);
-                arrOffset += iter_pri->position.size() * 4;
+                arrOffset += static_cast<int>(iter_pri->position.size() * 4);
                 std::vector<uchar> positionBuffer;
                 convertTogltf::AccessorsDataD2F dataPosition;
                 dataPosition.accessorsData = iter_pri->position;
@@ -256,7 +256,7 @@ void CreateGltfCommon::createAccessors()
                 normalAcc.type          = TINYGLTF_TYPE_VEC3;
                 normalAcc.count         = iter_pri->normal.size() / 3;
                 model.accessors.emplace_back(normalAcc);
-                arrOffset += iter_pri->normal.size() * 4;
+                arrOffset += static_cast<int>(iter_pri->normal.size() * 4);
                 std::vector<uchar> normalBuffer;
                 convertTogltf::AccessorsDataD2F dataNormal;
                 dataNormal.accessorsData = iter_pri->normal;
@@ -273,7 +273,7 @@ void CreateGltfCommon::createAccessors()
                 colorlAcc.type          = TINYGLTF_TYPE_VEC3;
                 colorlAcc.count         = iter_pri->color.size() / 3;
                 model.accessors.emplace_back(colorlAcc);
-                arrOffset += iter_pri->color.size() * 4;
+                arrOffset += static_cast<int>(iter_pri->color.size() * 4);
                 std::vector<uchar> colorlBuffer;
                 convertTogltf::AccessorsDataD2F dataNormal;
                 dataNormal.accessorsData = iter_pri->color;
@@ -290,7 +290,7 @@ void CreateGltfCommon::createAccessors()
                 accessorUv.count         = iter_pri->uv.size() / 2;
                 accessorUv.type          = TINYGLTF_TYPE_VEC2;
                 model.accessors.emplace_back(accessorUv);
-                uvOffset += iter_pri->uv.size() * 4;
+                uvOffset += static_cast<int>(iter_pri->uv.size() * 4);
                 std::vector<uchar> uvBuffer;
                 convertTogltf::AccessorsDataD2F dataUV;
                 dataUV.accessorsData = iter_pri->uv;

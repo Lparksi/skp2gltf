@@ -109,9 +109,9 @@ namespace convertTogltf
                 uchar indec[4];
                 int n = accessorsData[i];
                 memcpy(&indec, &n, 4);
-                for (int i = 0; i < 4; ++i)
+                for (int j = 0; j < 4; ++j)
                 {
-                    data.emplace_back(indec[i]);
+                    data.emplace_back(indec[j]);
                 }
             }
         }
@@ -141,9 +141,9 @@ namespace convertTogltf
                 uchar indec[4];
                 uint n = accessorsData[i];
                 memcpy(&indec, &n, 4);
-                for (int i = 0; i < 4; ++i)
+                for (int j = 0; j < 4; ++j)
                 {
-                    data.emplace_back(indec[i]);
+                    data.emplace_back(indec[j]);
                 }
             }
         }
@@ -159,11 +159,11 @@ namespace convertTogltf
             for (int i = 0; i < accessorsData.size(); ++i)
             {
                 uchar indec[4];
-                uint n = accessorsData[i];
+                size_t n = accessorsData[i];
                 memcpy(&indec, &n, 4);
-                for (int i = 0; i < 4; ++i)
+                for (int j = 0; j < 4; ++j)
                 {
-                    data.emplace_back(indec[i]);
+                    data.emplace_back(indec[j]);
                 }
             }
         }
@@ -193,9 +193,9 @@ namespace convertTogltf
                 uchar indec[2];
                 short n = accessorsData[i];
                 memcpy(&indec, &n, 2);
-                for (int i = 0; i < 2; ++i)
+                for (int j = 0; j < 2; ++j)
                 {
-                    data.emplace_back(indec[i]);
+                    data.emplace_back(indec[j]);
                 }
             }
         }
@@ -225,9 +225,9 @@ namespace convertTogltf
                 uchar indec[2];
                 unshort n = accessorsData[i];
                 memcpy(&indec, &n, 2);
-                for (int i = 0; i < 2; ++i)
+                for (int j = 0; j < 2; ++j)
                 {
-                    data.emplace_back(indec[i]);
+                    data.emplace_back(indec[j]);
                 }
             }
         }
@@ -255,11 +255,11 @@ namespace convertTogltf
             for (int i = 0; i < accessorsData.size(); ++i)
             {
                 uchar indec[8];
-                float n = accessorsData[i];
+                double n = accessorsData[i];
                 memcpy(&indec, &n, 8);
-                for (int i = 0; i < 8; ++i)
+                for (int j = 0; j < 8; ++j)
                 {
-                    data.emplace_back(indec[i]);
+                    data.emplace_back(indec[j]);
                 }
             }
         }
@@ -289,9 +289,9 @@ namespace convertTogltf
                 uchar indec[4];
                 float n = accessorsData[i];
                 memcpy(&indec, &n, 4);
-                for (int i = 0; i < 4; ++i)
+                for (int j = 0; j < 4; ++j)
                 {
-                    data.emplace_back(indec[i]);
+                    data.emplace_back(indec[j]);
                 }
             }
         }
@@ -307,11 +307,11 @@ namespace convertTogltf
             for (int i = 0; i < accessorsData.size(); ++i)
             {
                 uchar indec[4];
-                float n = accessorsData[i];
+                float n = static_cast<float>(accessorsData[i]);
                 memcpy(&indec, &n, 4);
-                for (int i = 0; i < 4; ++i)
+                for (int j = 0; j < 4; ++j)
                 {
-                    data.emplace_back(indec[i]);
+                    data.emplace_back(indec[j]);
                 }
             }
         }
