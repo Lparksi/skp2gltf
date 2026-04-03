@@ -135,13 +135,25 @@ jobs:
           TAG="ghcr.io/${REPO_LC}:test-${{ github.sha }}"
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
 
-      - name: Build and Push
+      - name: Build and Push (AMD64)
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          file: ./Dockerfile.amd64
+          platforms: linux/amd64
           push: true
-          tags: ${{ steps.image_info.outputs.tag }}
+          tags: ${{ steps.image_info.outputs.tag }}-amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and Push (ARM64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.arm64
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.image_info.outputs.tag }}-arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -183,15 +195,24 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull Test Image
-        run: docker pull --platform ${{ matrix.platform }} ${{ needs.build-docker-image.outputs.image_tag }}
+        run: |
+          if [[ "${{ matrix.platform }}" == "linux/arm64" ]]; then
+            docker pull ${{ needs.build-docker-image.outputs.image_tag }}-arm64
+          else
+            docker pull ${{ needs.build-docker-image.outputs.image_tag }}-amd64
+          fi
 
       - name: Run Test in Docker
         run: |
+          IMAGE_TAG="${{ needs.build-docker-image.outputs.image_tag }}-amd64"
+          if [[ "${{ matrix.platform }}" == "linux/arm64" ]]; then
+            IMAGE_TAG="${{ needs.build-docker-image.outputs.image_tag }}-arm64"
+          fi
+          
           mkdir -p output
           docker run --rm \
-            --platform ${{ matrix.platform }} \
             -v "${PWD}:/work" \
-            ${{ needs.build-docker-image.outputs.image_tag }} \
+            ${IMAGE_TAG} \
             /work/test/test_model.skp /work/output result glb
 
       - name: Verify Output
@@ -228,16 +249,20 @@ jobs:
       - name: Tag and Push Final
         run: |
           TEST_TAG="${{ needs.build-docker-image.outputs.image_tag }}"
-          FINAL_TAG="ghcr.io/${{ steps.image_info.outputs.repo }}:latest"
+          REPO="ghcr.io/${{ steps.image_info.outputs.repo }}"
           
-          # Pull the multi-platform image manifest and re-tag
-          docker buildx imagetools create \
-            --tag ${FINAL_TAG} \
-            ${TEST_TAG}
+          # Push both architecture tags to latest
+          docker buildx imagetools create --tag ${REPO}:latest-amd64 ${TEST_TAG}-amd64
+          docker buildx imagetools create --tag ${REPO}:latest-arm64 ${TEST_TAG}-arm64
           
-          # If it's a version tag, also push it
+          # Optional: create a consolidated 'latest' manifest if you still want it
+          docker buildx imagetools create --tag ${REPO}:latest ${TEST_TAG}-amd64 ${TEST_TAG}-arm64
+          
+          # Version tags
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            VERSION_TAG="ghcr.io/${{ steps.image_info.outputs.repo }}:${{ github.ref_name }}"
-            docker buildx imagetools create --tag ${VERSION_TAG} ${TEST_TAG}
+            VER="${{ github.ref_name }}"
+            docker buildx imagetools create --tag ${REPO}:${VER}-amd64 ${TEST_TAG}-amd64
+            docker buildx imagetools create --tag ${REPO}:${VER}-arm64 ${TEST_TAG}-arm64
+            docker buildx imagetools create --tag ${REPO}:${VER} ${TEST_TAG}-amd64 ${TEST_TAG}-arm64
           fi
 

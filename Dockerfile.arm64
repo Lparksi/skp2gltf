@@ -1,0 +1,46 @@
+FROM debian:bookworm-slim
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    DISPLAY=:99 \
+    WINEARCH=win64 \
+    WINEDEBUG=-all \
+    WINEDLLOVERRIDES=mscoree,mshtml= \
+    WINEPREFIX=/root/.wine
+
+# Install base dependencies (ARM64 specific)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        wget \
+        gnupg2 \
+        xvfb \
+        xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Setup Box64 + Kron4ek Wine (optimized for ARM64)
+RUN wget -qO- https://ryanfortner.github.io/box64-debs/KEY.gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/box64-debs-archive-keyring.gpg && \
+    echo "deb [arch=arm64] https://ryanfortner.github.io/box64-debs/ ./" > /etc/apt/sources.list.d/box64-debs.list && \
+    apt-get update && apt-get install -y --no-install-recommends box64 && \
+    mkdir -p /opt/wine-stable && \
+    curl -SL https://github.com/Kron4ek/Wine-Builds/releases/download/9.0/wine-9.0-amd64.tar.xz | tar -xJ -C /opt/wine-stable --strip-components=1 && \
+    ln -s /opt/wine-stable/bin/wine64 /usr/local/bin/wine64 && \
+    ln -s /opt/wine-stable/bin/wine /usr/local/bin/wine && \
+    rm -rf /var/lib/apt/lists/*
+
+# Pre-initialize Win64 prefix using Box64
+RUN Xvfb :99 -screen 0 1024x768x24 & \
+    PID=$! && \
+    sleep 5 && \
+    box64 wine64 wineboot --init && \
+    wineserver -w && \
+    kill $PID || true
+
+WORKDIR /app
+
+# Copy Windows build artifacts
+COPY docker-bin/ /app/
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

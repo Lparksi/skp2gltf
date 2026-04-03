@@ -1,0 +1,43 @@
+FROM debian:bookworm-slim
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    DISPLAY=:99 \
+    WINEARCH=win64 \
+    WINEDEBUG=-all \
+    WINEDLLOVERRIDES=mscoree,mshtml= \
+    WINEPREFIX=/root/.wine
+
+# Install base dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        gnupg2 \
+        xvfb \
+    && rm -rf /var/lib/apt/lists/*
+
+# Setup WineHQ for amd64
+RUN dpkg --add-architecture i386 && \
+    mkdir -pm755 /etc/apt/keyrings && \
+    curl -fsSL https://dl.winehq.org/wine-builds/winehq.key | gpg --dearmor -o /etc/apt/keyrings/winehq-archive.key && \
+    echo "deb [arch=amd64,i386 signed-by=/etc/apt/keyrings/winehq-archive.key] https://dl.winehq.org/wine-builds/debian bookworm main" > /etc/apt/sources.list.d/winehq.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends winehq-stable && \
+    rm -rf /var/lib/apt/lists/*
+
+# Pre-initialize Win64 prefix
+RUN Xvfb :99 -screen 0 1024x768x24 & \
+    PID=$! && \
+    sleep 5 && \
+    DISPLAY=:99 wine64 wineboot --init && \
+    wineserver -w && \
+    kill $PID || true
+
+WORKDIR /app
+
+# Copy Windows build artifacts
+COPY docker-bin/ /app/
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
