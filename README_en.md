@@ -52,22 +52,25 @@ docker run -d --name skp_api -p 8000:8000 ghcr.io/lparksi/skp2gltf:latest --serv
 
 **Core API Endpoints:**
 
-| Endpoint | Method | Description |
-| :--- | :--- | :--- |
-| `/health` | `GET` | Health check, returns architecture and environment status |
-| `/convert` | `POST` | **File Upload**. Upload .skp and receive the converted .glb/.gltf file stream |
-| `/convert-path` | `POST` | **Path Task**. Convert files at a specific container path (useful with mounted volumes) |
+| Endpoint | Method | Description | Parameters |
+| :--- | :--- | :--- | :--- |
+| `/health` | `GET` | Health check, returns architecture and environment status | - |
+| `/convert` | `POST` | **File Upload**. Upload .skp and receive the converted .glb/.gltf file stream | `file` (req), `format` (glb/gltf), `draco` (true/false) |
+| `/convert-path` | `POST` | **Path Task**. Convert files at a specific container path | JSON Body: `input_path`, `output_dir`, `output_name`, `format`, `draco` |
 
 #### Mode B: Command Line (CLI)
 Best for simple local scripts.
 ```bash
 docker run --rm -v "${PWD}:/work" ghcr.io/lparksi/skp2gltf:latest \
-  /work/model.skp /work/output result glb
+  /work/model.skp /work/output result glb draco
 ```
+*(Note: Use `draco`, `true`, or `--draco` as the 5th argument to enable compression)*
 
 ### 3. Platform Optimizations
 - **AMD64 (Linux Server)**: Runs on native Wine with minimal overhead.
-- **ARM64 (Apple Silicon M1/M2/M3)**: Built-in **Box64** emulation, significantly faster than standard QEMU. *Ensure "Use Rosetta for x86_64/amd64 emulation" is enabled in Docker Desktop.*
+- **ARM64 (Apple Silicon M1/M2/M3)**: This project provides a **native ARM64 image** with built-in **Box64** emulation.
+    - **Recommended**: Run the native ARM64 image directly on Apple Silicon for performance several times faster than standard QEMU.
+    - **Rosetta Alternative**: If you choose to run the AMD64 version of the image, ensure "Use Rosetta for x86_64/amd64 emulation" is enabled in Docker Desktop.
 
 > [!NOTE]
 > **Queuing Mechanism**: To ensure maximum stability of the Wine environment, conversion tasks within each container are processed **serially**. For high throughput, scale by increasing the number of container instances.
@@ -81,7 +84,7 @@ docker run --rm -v "${PWD}:/work" ghcr.io/lparksi/skp2gltf:latest \
    cmake ..
    cmake --build . --config Release
    ```
-4. Run: `skp2gltf.exe <input.skp> <output_dir> <output_name> [format]`
+4. Run: `skp2gltf.exe <input.skp> <output_dir> <output_name_or_path> [format] [draco:true]`
 
 ## License
 

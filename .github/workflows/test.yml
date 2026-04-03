@@ -96,20 +96,27 @@ jobs:
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path "output" | Out-Null
           
-          Write-Host "Starting conversion test..."
-          # Note: test/test_model.skp should be available from checkout
+          Write-Host "Starting baseline conversion test..."
           & "bin/skp2gltf.exe" "test/test_model.skp" "output" "result" "glb"
-          
           if ($LASTEXITCODE -ne 0) {
             throw "Native conversion failed with exit code $LASTEXITCODE"
           }
-          
           if (-not (Test-Path "output/result.glb")) {
             throw "Output file output/result.glb not found!"
           }
-          
           $fileInfo = Get-Item "output/result.glb"
-          Write-Host "Test Passed! Output size: $($fileInfo.Length) bytes."
+          Write-Host "Baseline Test Passed! Output size: $($fileInfo.Length) bytes."
+          
+          Write-Host "Starting Draco compression test..."
+          & "bin/skp2gltf.exe" "test/test_model.skp" "output" "result_draco" "glb" "draco"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Native Draco conversion failed with exit code $LASTEXITCODE"
+          }
+          if (-not (Test-Path "output/result_draco.glb")) {
+            throw "Output file output/result_draco.glb not found!"
+          }
+          $dracoInfo = Get-Item "output/result_draco.glb"
+          Write-Host "Draco Test Passed! Output size: $($dracoInfo.Length) bytes."
 
   # 3. 构建 Docker 镜像 (AMD64)
   build-docker-amd64:
@@ -171,6 +178,8 @@ jobs:
           mkdir -p output
           docker run --rm -v "${PWD}:/work" ${{ needs.build-docker-amd64.outputs.tag }} \
             /work/test/test_model.skp /work/output result glb
+          docker run --rm -v "${PWD}:/work" ${{ needs.build-docker-amd64.outputs.tag }} \
+            /work/test/test_model.skp /work/output result_draco glb draco
       - name: Run Test (API Mode)
         run: |
           echo "::group::Starting API Container"
@@ -261,6 +270,8 @@ jobs:
           mkdir -p output
           docker run --rm --platform linux/arm64 -v "${PWD}:/work" ${{ needs.build-docker-arm64.outputs.tag }} \
             /work/test/test_model.skp /work/output result glb
+          docker run --rm --platform linux/arm64 -v "${PWD}:/work" ${{ needs.build-docker-arm64.outputs.tag }} \
+            /work/test/test_model.skp /work/output result_draco glb draco
       - name: Run Test (API Mode)
         run: |
           echo "::group::Starting API Container"

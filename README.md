@@ -52,22 +52,25 @@ docker run -d --name skp_api -p 8000:8000 ghcr.io/lparksi/skp2gltf:latest --serv
 
 **核心 API 接口：**
 
-| 接口 | 方法 | 说明 |
-| :--- | :--- | :--- |
-| `/health` | `GET` | 健康检查，返回系统架构和运行环境状态 |
-| `/convert` | `POST` | **文件上传转换**。接收 .skp 文件，返回转换后的 .glb/.gltf 文件流 |
-| `/convert-path` | `POST` | **任务指派**。指定容器内路径进行转换，适用于挂载了共享存储的场景 |
+| 接口 | 方法 | 说明 | 参数 |
+| :--- | :--- | :--- | :--- |
+| `/health` | `GET` | 健康检查，返回系统架构和运行环境状态 | - |
+| `/convert` | `POST` | **文件上传转换**。接收 .skp 文件，返回预览或转换后的文件流 | `file` (必填), `format` (glb/gltf), `draco` (true/false) |
+| `/convert-path` | `POST` | **路径任务**。通过容器内绝对路径指定文件进行转换 | JSON Body: `input_path`, `output_dir`, `output_name`, `format`, `draco` |
 
 #### 模式 B：命令行单次任务 (CLI)
 适用于简单的本地转换脚本。
 ```bash
 docker run --rm -v "${PWD}:/work" ghcr.io/lparksi/skp2gltf:latest \
-  /work/model.skp /work/output result glb
+  /work/model.skp /work/output result glb draco
 ```
+*(注：第 5 个参数支持 `draco`, `true` 或 `--draco` 以开启压缩)*
 
 ### 3. 不同平台优化
 - **AMD64 (Linux Server)**: 使用原生 Wine，性能损耗极低。
-- **ARM64 (Apple Silicon M1/M2/M3)**: 内置 **Box64** 模拟层，比传统的 QEMU 模拟快数倍。*请确保 Docker Desktop 开启了 "Use Rosetta for x86_64/amd64 emulation"。*
+- **ARM64 (Apple Silicon M1/M2/M3)**: 本项目提供 **原生 ARM64 镜像**，内置 **Box64** 仿真。
+    - **推荐**：在 Apple Silicon 上直接运行本站提供的 ARM64 镜像，比传统的 QEMU 模拟快数倍。
+    - **Rosetta 备选**：如果你选择运行 AMD64 版本的镜像，请确保 Docker Desktop 开启了 "Use Rosetta for x86_64/amd64 emulation" 已获得最佳兼容性。
 
 > [!NOTE]
 > **排队机制**: 为了保证 Wine 环境运行的极致稳定性，每个容器内部的转换任务采用 **串行执行 (Serial Queue)**。如果需要极高的吞吐量，请横向扩展容器实例数量。
@@ -81,7 +84,7 @@ docker run --rm -v "${PWD}:/work" ghcr.io/lparksi/skp2gltf:latest \
    cmake ..
    cmake --build . --config Release
    ```
-4. 运行：`skp2gltf.exe <input.skp> <output_dir> <output_name> [format]`
+4. 运行：`skp2gltf.exe <input.skp> <output_dir> <output_name_or_path> [format] [draco:true]`
 
 ## 许可证
 

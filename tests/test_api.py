@@ -39,22 +39,28 @@ async def test_convert_upload_invalid_ext(client: httpx.AsyncClient):
 # Note: Integration test with actual .skp requires a valid file and Wine running
 # For CI, we can use a dummy file and check if it attempts to call the bin.
 @pytest.mark.asyncio
-async def test_convert_upload_workflow(client: httpx.AsyncClient):
-    """
-    Integration test - attempts to convert a dummy .skp
-    In CI, this might fail with 500 if Wine isn't ready or the file is junk,
-    but it tests the FastAPI wiring.
-    """
+async def test_convert_upload_draco(client: httpx.AsyncClient):
+    """Test the draco parameter in the upload workflow"""
     dummy_content = b"This is a dummy SKP for API testing"
     files = {"file": ("test.skp", dummy_content, "application/octet-stream")}
     
-    # We expect 500 here because the dummy content isn't a real SKP,
-    # but the logic should flow correctly through the subprocess call.
-    response = await client.post("/convert", files=files)
-    
-    # If the converter was actually called and failed, it's a 500.
-    # If it's a success (unlikely with junk data), it's a 200.
+    # We test with draco=True parameter
+    response = await client.post("/convert?draco=true", files=files)
     assert response.status_code in [200, 500]
+
+@pytest.mark.asyncio
+async def test_convert_path(client: httpx.AsyncClient):
+    """Test the /convert-path endpoint"""
+    # Assuming this runs in a container where /app/api.py or something exists,
+    # but for a pure API test, we just check for errors with non-existent paths first.
+    payload = {
+        "input_path": "/non/existent/path.skp",
+        "output_dir": "/tmp/output",
+        "draco": True
+    }
+    response = await client.post("/convert-path", json=payload)
+    # Should be 404 because file doesn't exist
+    assert response.status_code == 404
 
 if __name__ == "__main__":
     # Simple manual test trigger
