@@ -47,7 +47,7 @@ FetchContent_MakeAvailable(draco)
 # so they are properly propagated to any target that links against it.
 target_include_directories(draco INTERFACE 
     ${draco_SOURCE_DIR}/src
-    ${draco_BINARY_DIR}
+    ${CMAKE_BINARY_DIR}
 )
 
 include_directories(
@@ -66,7 +66,7 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/thirdparty/tinyxml2
     ${PROJECT_SOURCE_DIR}/thirdparty/xml2json
     ${draco_SOURCE_DIR}/src
-    ${draco_BINARY_DIR}
+    ${CMAKE_BINARY_DIR}
 )
 
 # 添加子目录
