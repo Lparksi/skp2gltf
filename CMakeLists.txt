@@ -43,6 +43,13 @@ set(DRACO_MESH_COMPRESSION ON CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(draco)
 
+# Explicitly add the necessary include directories to the `draco` target
+# so they are properly propagated to any target that links against it.
+target_include_directories(draco INTERFACE 
+    ${draco_SOURCE_DIR}/src
+    ${draco_BINARY_DIR}
+)
+
 include_directories(
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/include/exportgltf
