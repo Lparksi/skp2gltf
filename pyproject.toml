@@ -1,6 +1,6 @@
 [project]
 name = "skp2gltf-api"
-version = "0.1.0"
+version = "0.1.2"
 description = "FastAPI wrapper for skp2gltf conversion"
 dependencies = [
     "fastapi>=0.109.0",
