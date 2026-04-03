@@ -1,4 +1,4 @@
-name: Functionality Test
+name: Multi-Platform Test
 
 on:
   push:
@@ -6,10 +6,15 @@ on:
       - '**'
   pull_request:
 
-jobs:
-  test-conversion:
-    runs-on: windows-latest
+permissions:
+  contents: read
+  packages: write
 
+jobs:
+  # 1. Windows 构建
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,53 +25,18 @@ jobs:
       - name: Build (Release)
         run: cmake --build build --config Release --parallel
 
-      - name: Prepare Test Model
-        shell: pwsh
-        run: |
-          Copy-Item "test/test_model.skp" "test_model.skp"
-
-      - name: Run Conversion Test
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $releaseDir = "build/Release"
-          
-          # Create output directory
-          New-Item -ItemType Directory -Force -Path "output" | Out-Null
-          
-          # Run the skp2gltf binary
-          Write-Host "Starting conversion..."
-          & "$releaseDir/skp2gltf.exe" "test_model.skp" "output" "result" "glb"
-          
-          if ($LASTEXITCODE -ne 0) {
-            throw "Conversion utility failed with exit code $LASTEXITCODE"
-          }
-          
-          # Verify that result.glb exists
-          if (-not (Test-Path "output/result.glb")) {
-            throw "Conversion command succeeded but output/result.glb was not found!"
-          }
-          
-          $fileInfo = Get-Item "output/result.glb"
-          Write-Host "Test Passed! Output file size: $($fileInfo.Length) bytes."
-
-      - name: Stage Docker Binaries
+      - name: Prepare Binaries for Testing & Docker
         shell: pwsh
         run: |
           $binDir = "docker-bin"
           New-Item -ItemType Directory -Path $binDir -Force | Out-Null
           
-          # Copy our build results
+          # Copy build results
           Copy-Item build/Release/*.exe $binDir/
           Copy-Item build/Release/*.dll $binDir/
           
-          # Copy SketchUp SDK DLLs from lib/ just in case
-          if (Test-Path "lib/*.dll") {
-            Copy-Item lib/*.dll $binDir/ -ErrorAction SilentlyContinue
-          }
-          
           # IMPORTANT: SketchUp SDK depends on MSVC Runtime DLLs.
-          # We need to collect them from the runner to bundle into the Docker image.
+          # We collect them from the runner to bundle into the Docker image.
           $sys32 = "C:\Windows\System32"
           $msvcDlls = @("vcruntime140.dll", "msvcp140.dll", "msvcp140_1.dll", "msvcp140_2.dll", "msvcp140_codecvt_ids.dll")
           foreach ($dll in $msvcDlls) {
@@ -76,14 +46,98 @@ jobs:
             }
           }
 
-      - name: Upload Docker Binaries for Docker Test
+      - name: Upload Binaries (Artifact)
         uses: actions/upload-artifact@v4
         with:
-          name: docker-bin-test
-          if-no-files-found: error
+          name: windows-binaries
           path: docker-bin/*
+          if-no-files-found: error
 
-  test-docker:
+  # 2. Windows 原生测试
+  test-native-windows:
+    name: Native Test (Windows)
+    needs: build-windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-binaries
+          path: bin
+
+      - name: Run Native Test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path "output" | Out-Null
+          
+          Write-Host "Starting conversion test..."
+          # Note: test/test_model.skp should be available from checkout
+          & "bin/skp2gltf.exe" "test/test_model.skp" "output" "result" "glb"
+          
+          if ($LASTEXITCODE -ne 0) {
+            throw "Native conversion failed with exit code $LASTEXITCODE"
+          }
+          
+          if (-not (Test-Path "output/result.glb")) {
+            throw "Output file output/result.glb not found!"
+          }
+          
+          $fileInfo = Get-Item "output/result.glb"
+          Write-Host "Test Passed! Output size: $($fileInfo.Length) bytes."
+
+  # 3. 构建 Multi-platform Docker 镜像
+  build-docker-image:
+    name: Build Docker Image
+    needs: test-native-windows
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.image_info.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Binaries (from build step)
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-binaries
+          path: docker-bin
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get Repo Lowercase and Tag
+        id: image_info
+        run: |
+          REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          TAG="ghcr.io/${REPO_LC}:test-${{ github.sha }}"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      - name: Build and Push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.image_info.outputs.tag }}
+
+  # 4. 各平台 Docker 测试
+  test-docker-multiplatform:
+    name: Docker Test (${{ matrix.name }})
+    needs: build-docker-image
     strategy:
       fail-fast: false
       matrix:
@@ -91,57 +145,49 @@ jobs:
           - os: ubuntu-latest
             platform: linux/amd64
             name: Linux-x64
-          - os: ubuntu-24.04-arm64
+          - os: macos-13
+            platform: linux/amd64
+            name: MacOS-x64
+          - os: macos-14
             platform: linux/arm64
-            name: Linux-arm64
-    name: Docker Test (${{ matrix.name }})
+            name: MacOS-arm64
+          - os: macos-latest
+            platform: linux/arm64
+            name: MacOS-latest-arm64
     runs-on: ${{ matrix.os }}
-    needs: test-conversion
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        if: matrix.os == 'ubuntu-latest'
-        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker (macOS only)
+        if: runner.os == 'macOS'
+        uses: docker-practice/actions-setup-docker@v1
+        timeout-minutes: 20
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Download Docker Binaries
-        uses: actions/download-artifact@v4
+      - name: Login to GHCR
+        uses: docker/login-action@v3
         with:
-          name: docker-bin-test
-          path: docker-bin
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build local Docker image
+      - name: Pull Test Image
+        run: docker pull --platform ${{ matrix.platform }} ${{ needs.build-docker-image.outputs.image_tag }}
+
+      - name: Run Test in Docker
         run: |
-          docker buildx build \
-            --platform ${{ matrix.platform }} \
-            --load \
-            -t skp2gltf-test .
-
-      - name: Prepare Test Model
-        run: cp test/test_model.skp test_model.skp
-
-      - name: Prepare Output Directory
-        run: mkdir -p output
-
-      - name: Run Conversion in Docker
-        run: |
+          mkdir -p output
           docker run --rm \
             --platform ${{ matrix.platform }} \
-            -e WINEDLLOVERRIDES="mscoree,mshtml=" \
             -v "${PWD}:/work" \
-            skp2gltf-test \
-            /work/test_model.skp /work/output result glb
+            ${{ needs.build-docker-image.outputs.image_tag }} \
+            /work/test/test_model.skp /work/output result glb
 
-      - name: Verify Docker Output
+      - name: Verify Output
         run: |
           if [ ! -f "output/result.glb" ]; then
-            echo "Error: output/result.glb was not generated by Docker container."
+            echo "Error: output/result.glb was not generated."
             exit 1
           fi
-          echo "Docker test (${{ matrix.platform }}) successful!"
           ls -lh output/result.glb
+

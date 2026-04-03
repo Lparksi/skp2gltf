@@ -30,10 +30,23 @@ jobs:
       - name: Stage Docker Binaries
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path docker-bin -Force | Out-Null
-          Copy-Item build/Release/skp2gltf.exe docker-bin/
-          Copy-Item build/Release/SketchUpAPI.dll docker-bin/
-          Copy-Item build/Release/SketchUpCommonPreferences.dll docker-bin/
+          $binDir = "docker-bin"
+          New-Item -ItemType Directory -Path $binDir -Force | Out-Null
+          
+          # Copy our build results
+          Copy-Item build/Release/*.exe $binDir/
+          Copy-Item build/Release/*.dll $binDir/
+          
+          # IMPORTANT: SketchUp SDK depends on MSVC Runtime DLLs.
+          # We need to collect them from the runner to bundle into the Docker image.
+          $sys32 = "C:\Windows\System32"
+          $msvcDlls = @("vcruntime140.dll", "msvcp140.dll", "msvcp140_1.dll", "msvcp140_2.dll", "msvcp140_codecvt_ids.dll")
+          foreach ($dll in $msvcDlls) {
+            if (Test-Path "$sys32\$dll") {
+              Write-Host "Copying $dll from system32..."
+              Copy-Item "$sys32\$dll" $binDir/
+            }
+          }
 
       - name: Upload Docker Binaries
         uses: actions/upload-artifact@v4
