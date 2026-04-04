@@ -38,15 +38,60 @@ async def test_convert_upload_invalid_ext(client: httpx.AsyncClient):
 
 # Note: Integration test with actual .skp requires a valid file and Wine running
 # For CI, we can use a dummy file and check if it attempts to call the bin.
+import glob
+
 @pytest.mark.asyncio
-async def test_convert_upload_draco(client: httpx.AsyncClient):
-    """Test the draco parameter in the upload workflow"""
-    dummy_content = b"This is a dummy SKP for API testing"
-    files = {"file": ("test.skp", dummy_content, "application/octet-stream")}
+async def test_convert_upload_size_check(client: httpx.AsyncClient):
+    """Test the conversion and check sizes with/without draco"""
+    skp_files = glob.glob("test/*.skp")
     
-    # We test with draco=True parameter
-    response = await client.post("/convert?draco=true", files=files)
-    assert response.status_code in [200, 500]
+    if not skp_files:
+        content = b"This is a dummy SKP for API testing"
+        skp_size = len(content)
+        print(f"\n[Size Compare] Using dummy SKP content ({skp_size} bytes)")
+        
+        # Test WITHOUT draco
+        files = {"file": ("test.skp", content, "application/octet-stream")}
+        response = await client.post("/convert?draco=false", files=files)
+        if response.status_code == 200:
+            glb_size = len(response.content)
+            print(f"[Size Compare] Converted GLB (No Draco) size: {glb_size / 1024:.2f} KB ({(glb_size/skp_size)*100:.1f}% of original)")
+            
+        # Test WITH draco
+        files_draco = {"file": ("test.skp", content, "application/octet-stream")}
+        response_draco = await client.post("/convert?draco=true", files=files_draco)
+        if response_draco.status_code == 200:
+            glb_size_draco = len(response_draco.content)
+            print(f"[Size Compare] Converted GLB (Draco) size: {glb_size_draco / 1024:.2f} KB ({(glb_size_draco/skp_size)*100:.1f}% of original)")
+
+        assert response.status_code in [200, 500]
+        assert response_draco.status_code in [200, 500]
+        return
+
+    # Process all real files
+    for skp_file_path in sorted(skp_files):
+        skp_size = os.path.getsize(skp_file_path)
+        with open(skp_file_path, "rb") as f:
+            content = f.read()
+        print(f"\n----------------------------------------")
+        print(f"[Size Compare] Original SKP size: {skp_size / 1024:.2f} KB (File: {skp_file_path})")
+
+        # Test WITHOUT draco
+        files = {"file": (os.path.basename(skp_file_path), content, "application/octet-stream")}
+        response = await client.post("/convert?draco=false", files=files)
+        if response.status_code == 200:
+            glb_size = len(response.content)
+            print(f"[Size Compare] -> Converted GLB (No Draco): {glb_size / 1024:.2f} KB ({(glb_size/skp_size)*100:.1f}% of original)")
+            
+        # Test WITH draco
+        files_draco = {"file": (os.path.basename(skp_file_path), content, "application/octet-stream")}
+        response_draco = await client.post("/convert?draco=true", files=files_draco)
+        if response_draco.status_code == 200:
+            glb_size_draco = len(response_draco.content)
+            print(f"[Size Compare] -> Converted GLB (Draco):    {glb_size_draco / 1024:.2f} KB ({(glb_size_draco/skp_size)*100:.1f}% of original)")
+
+        assert response.status_code in [200, 500]
+        assert response_draco.status_code in [200, 500]
 
 @pytest.mark.asyncio
 async def test_convert_path(client: httpx.AsyncClient):

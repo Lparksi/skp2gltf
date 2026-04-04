@@ -204,7 +204,7 @@ jobs:
           done
           echo "::endgroup::"
           export API_URL="http://localhost:8000"
-          uv run pytest -v -o asyncio_mode=auto tests/test_api.py || (docker logs skp_api && exit 1)
+          uv run pytest -v -s -o asyncio_mode=auto tests/test_api.py || (docker logs skp_api && exit 1)
           docker stop skp_api && docker rm skp_api
 
   # 5. 构建 Docker 镜像 (ARM64)
@@ -296,7 +296,7 @@ jobs:
           done
           echo "::endgroup::"
           export API_URL="http://localhost:8000"
-          uv run pytest -v -o asyncio_mode=auto tests/test_api.py || (docker logs skp_api && exit 1)
+          uv run pytest -v -s -o asyncio_mode=auto tests/test_api.py || (docker logs skp_api && exit 1)
           docker stop skp_api && docker rm skp_api
 
   # 7. 发布正式镜像 (仅在 main 或 tag 时)

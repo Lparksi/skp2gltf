@@ -19,6 +19,8 @@
 #include <stdint.h>  // For int32_t type
 #include <cstdint>  // 添加这一行
 #include <cmath>    // 用于 std::sqrt（法线计算）
+#include <unordered_map>
+#include <functional>
 
 #include "xmlexporter.h"
 #include "xmltexturehelper.h"
@@ -538,6 +540,32 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
     // 添加一个默认buffer用于存储所有数据
     model.buffers.push_back(tinygltf::Buffer());
     
+    struct VertexData {
+        float x, y, z;
+        float nx, ny, nz;
+        float u, v;
+
+        bool operator==(const VertexData& o) const {
+            return x == o.x && y == o.y && z == o.z &&
+                   nx == o.nx && ny == o.ny && nz == o.nz &&
+                   u == o.u && v == o.v;
+        }
+    };
+
+    struct VertexDataHash {
+        size_t operator()(const VertexData& v) const {
+            size_t h1 = std::hash<float>()(v.x);
+            size_t h2 = std::hash<float>()(v.y);
+            size_t h3 = std::hash<float>()(v.z);
+            size_t h4 = std::hash<float>()(v.nx);
+            size_t h5 = std::hash<float>()(v.ny);
+            size_t h6 = std::hash<float>()(v.nz);
+            size_t h7 = std::hash<float>()(v.u);
+            size_t h8 = std::hash<float>()(v.v);
+            return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4) ^ (h6 << 5) ^ (h7 << 6) ^ (h8 << 7);
+        }
+    };
+
     for (auto &item : facetMap) {
         tinygltf::Mesh mesh;
         tinygltf::Primitive primitive;
@@ -548,6 +576,9 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
         std::vector<float> normals;
         std::vector<float> uvs;
         std::vector<unsigned int> indices;
+
+        // 顶点复用缓存
+        std::unordered_map<VertexData, unsigned int, VertexDataHash> vertexCache;
 
         // 添加用于计算边界的变量
         float posMin[3] = {FLT_MAX, FLT_MAX, FLT_MAX};
@@ -597,29 +628,46 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
                 float y = static_cast<float>(facetVec[i].vertex[j].y);
                 float z = static_cast<float>(facetVec[i].vertex[j].z);
                 
-                // 更新边界值
-                posMin[0] = (std::min)(posMin[0], x);
-                posMin[1] = (std::min)(posMin[1], y);
-                posMin[2] = (std::min)(posMin[2], z);
-                posMax[0] = (std::max)(posMax[0], x);
-                posMax[1] = (std::max)(posMax[1], y);
-                posMax[2] = (std::max)(posMax[2], z);
-                
-                positions.push_back(x);
-                positions.push_back(y);
-                positions.push_back(z);
-                
-                // 为三角形的每个顶点赋予相同的面法线 (flat shading)
-                normals.push_back(nx);
-                normals.push_back(ny);
-                normals.push_back(nz);
-
+                float u = 0.0f;
+                float v = 0.0f;
                 if (!facetVec.empty()) {
-                    uvs.push_back(static_cast<float>(facetVec[i].uv[j].x));
-                    uvs.push_back(static_cast<float>(-facetVec[i].uv[j].y));
+                    u = static_cast<float>(facetVec[i].uv[j].x);
+                    v = static_cast<float>(-facetVec[i].uv[j].y);
                 }
+
+                VertexData vData = {x, y, z, nx, ny, nz, u, v};
                 
-                indices.push_back(vertexOffset++);
+                auto it = vertexCache.find(vData);
+                if (it != vertexCache.end()) {
+                    // 复用已有顶点
+                    indices.push_back(it->second);
+                } else {
+                    // 记录新顶点
+                    unsigned int newIndex = vertexOffset++;
+                    vertexCache[vData] = newIndex;
+                    indices.push_back(newIndex);
+                    
+                    // 更新边界值
+                    posMin[0] = (std::min)(posMin[0], x);
+                    posMin[1] = (std::min)(posMin[1], y);
+                    posMin[2] = (std::min)(posMin[2], z);
+                    posMax[0] = (std::max)(posMax[0], x);
+                    posMax[1] = (std::max)(posMax[1], y);
+                    posMax[2] = (std::max)(posMax[2], z);
+                    
+                    positions.push_back(x);
+                    positions.push_back(y);
+                    positions.push_back(z);
+                    
+                    normals.push_back(nx);
+                    normals.push_back(ny);
+                    normals.push_back(nz);
+
+                    if (!facetVec.empty()) {
+                        uvs.push_back(u);
+                        uvs.push_back(v);
+                    }
+                }
             }
         }
 
