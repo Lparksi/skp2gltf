@@ -1,54 +1,67 @@
+# --- Stage 1: Wine Asset Preparation ---
+FROM debian:bookworm-slim AS wine-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl xz-utils ca-certificates
+
+# Using Kron4ek's "Liberated" Wine - pre-built, lightweight, and x86_64 only.
+# This avoids the huge footprint of official WineHQ Debian packages and i386 multiarchlibs.
+RUN mkdir -p /opt/wine && \
+    curl -SL https://github.com/Kron4ek/Wine-Builds/releases/download/9.0/wine-9.0-amd64.tar.xz | tar -xJ -C /opt/wine --strip-components=1 && \
+    # Prune 32-bit (x86) and WoW64 support since our app is 64-bit native.
+    # We remove the libraries used only for 32-bit apps to save significant space.
+    rm -rf /opt/wine/lib/wine/i386-windows /opt/wine/lib/wine/i386-unix /opt/wine/lib32
+
+# --- Stage 2: Final Runtime Image ---
 FROM debian:bookworm-slim
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+COPY --from=wine-builder /opt/wine /opt/wine
 
-
+# Minimal footprint environment
 ENV DEBIAN_FRONTEND=noninteractive \
     DISPLAY=:99 \
     WINEARCH=win64 \
     WINEDEBUG=-all \
     WINEDLLOVERRIDES=mscoree,mshtml= \
     WINEPREFIX=/root/.wine \
-    PATH="/app/.venv/bin:$PATH"
+    PATH="/opt/wine/bin:/app/.venv/bin:$PATH"
 
-# Install base dependencies
+# Install only basic system libraries required by Wine and Xvfb
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
-        curl \
-        gnupg2 \
         xvfb \
         python3 \
+        # Essential runtime libraries
+        libgl1 \
+        libfontconfig1 \
+        libx11-6 \
+        libxext6 \
+        libxrender1 \
     && rm -rf /var/lib/apt/lists/*
-
-
-# Setup WineHQ for amd64
-RUN dpkg --add-architecture i386 && \
-    mkdir -pm755 /etc/apt/keyrings && \
-    curl -fsSL https://dl.winehq.org/wine-builds/winehq.key | gpg --dearmor -o /etc/apt/keyrings/winehq-archive.key && \
-    echo "deb [arch=amd64,i386 signed-by=/etc/apt/keyrings/winehq-archive.key] https://dl.winehq.org/wine-builds/debian bookworm main" > /etc/apt/sources.list.d/winehq.list && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends winehq-stable && \
-    rm -rf /var/lib/apt/lists/*
-
-# Pre-initialize Win64 prefix
-RUN Xvfb :99 -screen 0 1024x768x24 & \
-    PID=$! && \
-    sleep 5 && \
-    DISPLAY=:99 wine64 wineboot --init && \
-    wineserver -w && \
-    kill $PID || true
 
 WORKDIR /app
 
-# Copy Windows build artifacts and API source
+# Copy artifacts and source
 COPY docker-bin/ /app/
 COPY api.py pyproject.toml /app/
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-RUN uv sync --no-dev --no-install-project
+# Pre-initialize Win64 prefix (reduces cold start time for API)
+RUN Xvfb :99 -screen 0 1024x768x24 & \
+    PID=$! && \
+    sleep 3 && \
+    DISPLAY=:99 wine64 wineboot --init && \
+    # Cleanup Wine generated cache to further reduce image size
+    rm -rf /root/.wine/drive_c/users/root/AppData/Local/Package\ Cache && \
+    wineserver -w && \
+    kill $PID || true
+
+# Install Python dependencies using uv
+RUN uv sync --no-dev --no-install-project && \
+    # Clear uv cache to save another ~50MB
+    rm -rf /root/.cache/uv
 
 EXPOSE 8000
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["--service"]
-
