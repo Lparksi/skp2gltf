@@ -52,6 +52,10 @@ RUN wget -qO- https://pi-apps-coders.github.io/box64-debs/KEY.gpg | gpg --dearmo
     apt-get update && apt-get install -y --no-install-recommends box64-generic-arm && \
     mkdir -p /opt/wine-stable && \
     curl -SL https://github.com/Kron4ek/Wine-Builds/releases/download/9.0/wine-9.0-amd64.tar.xz | tar -xJ -C /opt/wine-stable --strip-components=1 && \
+    # Prune 32-bit (x86) support - skp2gltf is native 64-bit
+    rm -rf /opt/wine-stable/lib/wine/i386-windows /opt/wine-stable/lib/wine/i386-unix /opt/wine-stable/lib32 && \
+    # Remove documentation to save space
+    rm -rf /opt/wine-stable/share/doc /opt/wine-stable/share/man && \
     ln -s /opt/wine-stable/bin/wine64 /usr/local/bin/wine64 && \
     ln -s /opt/wine-stable/bin/wine /usr/local/bin/wine && \
     rm -rf /var/lib/apt/lists/*
@@ -61,6 +65,8 @@ RUN Xvfb :99 -screen 0 1024x768x24 & \
     PID=$! && \
     sleep 5 && \
     box64 wine64 wineboot --init && \
+    # Cleanup prefix boilerplate
+    rm -rf /root/.wine/drive_c/users/root/AppData/Local/Package\ Cache && \
     wineserver -w && \
     kill $PID || true
 
@@ -72,7 +78,9 @@ COPY api.py pyproject.toml /app/
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-RUN uv sync --no-dev --no-install-project
+RUN uv sync --no-dev --no-install-project && \
+    # Cleanup cache
+    rm -rf /root/.cache/uv
 
 EXPOSE 8000
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
