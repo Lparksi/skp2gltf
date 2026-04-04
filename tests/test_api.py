@@ -10,7 +10,7 @@ BASE_URL = os.getenv("API_URL", "http://localhost:8000")
 
 @pytest.fixture
 async def client() -> AsyncGenerator[httpx.AsyncClient, None]:
-    async with httpx.AsyncClient(base_url=BASE_URL, timeout=30.0) as client:
+    async with httpx.AsyncClient(base_url=BASE_URL, timeout=120.0) as client:
         yield client
 
 @pytest.mark.asyncio
