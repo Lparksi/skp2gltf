@@ -6,7 +6,7 @@ if (NOT TARGET SketchUpAPI)
         set(UNZIP_EXECUTABLE "${BUILD_BIN_DIR}/unzip")
     endif()
 
-    if(NOT EXISTS "${SKETCHUP_SDK_DIR}/headers")
+    if(NOT EXISTS "${SKETCHUP_SDK_DIR}/headers" AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/sdk/SDK_WIN_x64_2021-0-339.zip")
         make_directory(${SKETCHUP_SDK_DIR})
         execute_process(
                 COMMAND "${UNZIP_EXECUTABLE}" -o "${CMAKE_CURRENT_SOURCE_DIR}/sdk/SDK_WIN_x64_2021-0-339.zip"
