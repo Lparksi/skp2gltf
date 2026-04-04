@@ -36,7 +36,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build
-          key: ${{ runner.os }}-cmake-${{ hashFiles('**/CMakeLists.txt') }}-${{ github.sha }}
+          # 使用源码和配置文件的哈希作为主 Key。如果源码没变，则可以直接命中 Primary Key 而不再需要 fallback。
+          key: ${{ runner.os }}-cmake-${{ hashFiles('**/CMakeLists.txt', 'src/**', 'include/**', 'thirdparty/**') }}
           restore-keys: |
             ${{ runner.os }}-cmake-${{ hashFiles('**/CMakeLists.txt') }}-
             ${{ runner.os }}-cmake-
