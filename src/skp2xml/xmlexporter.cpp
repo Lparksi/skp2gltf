@@ -18,6 +18,7 @@
 #include <cctype>
 #include <stdint.h>  // For int32_t type
 #include <cstdint>  // 添加这一行
+#include <cmath>    // 用于 std::sqrt（法线计算）
 
 #include "xmlexporter.h"
 #include "xmltexturehelper.h"
@@ -542,8 +543,9 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
         tinygltf::Primitive primitive;
         primitive.mode = 4;  // triangles
         
-        // 收集顶点和索引数据
+        // 收集顶点、法线和索引数据
         std::vector<float> positions;
+        std::vector<float> normals;
         std::vector<float> uvs;
         std::vector<unsigned int> indices;
 
@@ -555,6 +557,41 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
         size_t vertexOffset = 0;
         
         for (size_t i = 0; i < facetVec.size(); i++) {
+            // 先提取三角形的三个顶点坐标
+            float v0[3] = {
+                static_cast<float>(facetVec[i].vertex[0].x),
+                static_cast<float>(facetVec[i].vertex[0].y),
+                static_cast<float>(facetVec[i].vertex[0].z)
+            };
+            float v1[3] = {
+                static_cast<float>(facetVec[i].vertex[1].x),
+                static_cast<float>(facetVec[i].vertex[1].y),
+                static_cast<float>(facetVec[i].vertex[1].z)
+            };
+            float v2[3] = {
+                static_cast<float>(facetVec[i].vertex[2].x),
+                static_cast<float>(facetVec[i].vertex[2].y),
+                static_cast<float>(facetVec[i].vertex[2].z)
+            };
+            
+            // 计算面法线: normal = normalize(cross(v1-v0, v2-v0))
+            float edge1[3] = {v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]};
+            float edge2[3] = {v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]};
+            float nx = edge1[1] * edge2[2] - edge1[2] * edge2[1];
+            float ny = edge1[2] * edge2[0] - edge1[0] * edge2[2];
+            float nz = edge1[0] * edge2[1] - edge1[1] * edge2[0];
+            float len = std::sqrt(nx * nx + ny * ny + nz * nz);
+            if (len > 1e-8f) {
+                nx /= len;
+                ny /= len;
+                nz /= len;
+            } else {
+                // 退化三角形，使用默认法线
+                nx = 0.0f;
+                ny = 0.0f;
+                nz = 1.0f;
+            }
+            
             for (int j = 0; j < 3; j++) {
                 float x = static_cast<float>(facetVec[i].vertex[j].x);
                 float y = static_cast<float>(facetVec[i].vertex[j].y);
@@ -571,6 +608,11 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
                 positions.push_back(x);
                 positions.push_back(y);
                 positions.push_back(z);
+                
+                // 为三角形的每个顶点赋予相同的面法线 (flat shading)
+                normals.push_back(nx);
+                normals.push_back(ny);
+                normals.push_back(nz);
 
                 if (!facetVec.empty()) {
                     uvs.push_back(static_cast<float>(facetVec[i].uv[j].x));
@@ -611,6 +653,34 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
             model.accessors.push_back(accessor);
             
             primitive.attributes["POSITION"] = positionAccessorIndex;
+        }
+
+        // 创建并添加法线buffer
+        {
+            tinygltf::BufferView bufferView;
+            bufferView.buffer = 0;
+            bufferView.byteOffset = model.buffers[0].data.size();
+            bufferView.byteLength = normals.size() * sizeof(float);
+            bufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
+            
+            size_t bufferOffset = model.buffers[0].data.size();
+            model.buffers[0].data.resize(bufferOffset + bufferView.byteLength);
+            memcpy(model.buffers[0].data.data() + bufferOffset, normals.data(), bufferView.byteLength);
+            
+            int normalBufferViewIndex = model.bufferViews.size();
+            model.bufferViews.push_back(bufferView);
+            
+            tinygltf::Accessor accessor;
+            accessor.bufferView = normalBufferViewIndex;
+            accessor.byteOffset = 0;
+            accessor.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
+            accessor.count = normals.size() / 3;
+            accessor.type = TINYGLTF_TYPE_VEC3;
+            
+            int normalAccessorIndex = model.accessors.size();
+            model.accessors.push_back(accessor);
+            
+            primitive.attributes["NORMAL"] = normalAccessorIndex;
         }
         
         // 创建并添加UV buffer (如果有UV数据)
