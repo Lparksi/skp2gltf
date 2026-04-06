@@ -22,8 +22,8 @@
 
 #include <SketchUpAPI/import_export/pluginprogresscallback.h>
 #include <SketchUpAPI/model/defs.h>
-#include <SketchUpAPI/model/transformation.h>
-#include <SketchUpAPI/model/color.h>
+#include <SketchUpAPI/transformation.h>
+#include <SketchUpAPI/color.h>
 
 struct SkpMaterialInfo {
     std::string name_;
