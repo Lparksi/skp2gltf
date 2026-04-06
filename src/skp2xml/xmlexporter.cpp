@@ -960,74 +960,48 @@ void CXmlExporter::WriteFace(SUFaceRef face, const SUTransformation &transformat
         }
     }
     
-    std::vector<size_t> optimizedIndices;
-    std::vector<Vector3> uniqueVerticesVec;
-    std::vector<Vector3> uniqueUVsVec;
-
+    // Process triangles
     for (size_t i = 0; i < num_triangles; i++) {
-        for (size_t j = 0; j < 3; j++) {
-            size_t index = indices[i * 3 + j];
-            
-            VertexKey key;
-            // 转换顶点坐标
-            double vertex[3] = {vertices[index].x, vertices[index].y, vertices[index].z};
-            double transformed[3] = {0, 0, 0};
-            
-            for (int ii = 0; ii < 3; ii++) {
-                for (int jj = 0; jj < 3; jj++) {
-                    transformed[ii] += vertex[jj] * transformation.values[pos(ii, jj)];
-                }
-                transformed[ii] += transformation.values[pos(ii, 3)];
-            }
-            
-            key.x = transformed[0];
-            key.y = transformed[1];
-            key.z = transformed[2];
-            
-            // 设置UV坐标
-            if (info.has_front_texture_) {
-                SUPoint3D stq = front_stq[index];
-                key.u = stq.x * materialInfo.texture_sscale_;
-                key.v = stq.y * materialInfo.texture_tscale_;
-            } else {
-                key.u = key.v = 0.0;
-            }
-            
-            // 获取或创建新的顶点索引
-            size_t optimizedIndex = GetOrCreateVertexIndex(key);
-            optimizedIndices.push_back(optimizedIndex);
-            
-            if (optimizedIndex == uniqueVerticesVec.size()) {
-                // 这是一个新顶点
-                uniqueVerticesVec.push_back(Vector3(transformed[0], transformed[1], transformed[2]));
-                if (info.has_front_texture_) {
-                    uniqueUVsVec.push_back(Vector3(key.u, key.v, 0));
-                }
-            }
-        }
-
-        // 创建面片并添加到facetMap
         cFacet aFacet;
-        // ... 设置法线和颜色 ...
+        
+        // Face normal
+        SUVector3D normal = normalArr[i];
+        aFacet.normal = Vector3(normal.x, normal.y, normal.z);
+        
+        // Triangle color/material
+        Color color1((double)color.r, (double)color.g, (double)color.b, (double)color.a, color.imageUri, color.name);
         
         for (int j = 0; j < 3; j++) {
-            size_t idx = optimizedIndices[i * 3 + j];
-            aFacet.vertex[j] = uniqueVerticesVec[idx];
+            size_t vertexIndex = indices[i * 3 + j];
+            SUPoint3D pt = vertices[vertexIndex];
+            
+            // Transform point
+            double transformedPt[3] = {pt.x, pt.y, pt.z};
+            double result[3] = {0,0,0};
+            for (int r = 0; r < 3; r++) {
+                for (int c = 0; c < 3; c++) {
+                    result[r] += transformedPt[c] * transformation.values[pos(r, c)];
+                }
+                result[r] += transformation.values[pos(r, 3)];
+            }
+            
+            aFacet.vertex[j] = Vector3(result[0], result[1], result[2]);
+            
             if (info.has_front_texture_) {
-                aFacet.uv[j] = uniqueUVsVec[idx];
+                SUPoint3D stq = front_stq[vertexIndex];
+                aFacet.uv[j] = Vector3(stq.x * materialInfo.texture_sscale_, stq.y * materialInfo.texture_tscale_, 0.0);
+            } else {
+                aFacet.uv[j] = Vector3(0.0, 0.0, 0.0);
             }
         }
         
-        // 添加到facetMap
-        Color color1((double)color.r, (double)color.g, (double)color.b, 
-                    (double)color.a, color.imageUri, color.name);
-        (*activeFacetMap_)[color1].push_back(aFacet);
+        // Add to the current active mesh
+        if (activeFacetMap_) {
+            (*activeFacetMap_)[color1].push_back(aFacet);
+        }
     }
-
-    // 清理本次处理的顶点缓存
-    ClearVertexCache();
     
-    SU_CALL(SUMeshHelperRelease(&mesh_ref));  // 及时释放mesh资源
+    SU_CALL(SUMeshHelperRelease(&mesh_ref));
     SU_CALL(SUUVHelperRelease(&uv_helper));
 }
 
