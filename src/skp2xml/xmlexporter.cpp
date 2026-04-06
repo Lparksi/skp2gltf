@@ -567,27 +567,22 @@ void CXmlExporter::getComponentEntity(SUEntitiesRef entities, const SUTransforma
 int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::string &outputFormat, bool use_draco) {
     struct VertexData {
         float x, y, z;
-        float nx, ny, nz;
         float u, v;
 
         bool operator==(const VertexData& o) const {
-            return x == o.x && y == o.y && z == o.z &&
-                   nx == o.nx && ny == o.ny && nz == o.nz &&
-                   u == o.u && v == o.v;
+            return std::abs(x - o.x) < 1e-5f && std::abs(y - o.y) < 1e-5f && std::abs(z - o.z) < 1e-5f &&
+                   std::abs(u - o.u) < 1e-5f && std::abs(v - o.v) < 1e-5f;
         }
     };
 
     struct VertexDataHash {
         size_t operator()(const VertexData& v) const {
-            size_t h1 = std::hash<float>()(v.x);
-            size_t h2 = std::hash<float>()(v.y);
-            size_t h3 = std::hash<float>()(v.z);
-            size_t h4 = std::hash<float>()(v.nx);
-            size_t h5 = std::hash<float>()(v.ny);
-            size_t h6 = std::hash<float>()(v.nz);
-            size_t h7 = std::hash<float>()(v.u);
-            size_t h8 = std::hash<float>()(v.v);
-            return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4) ^ (h6 << 5) ^ (h7 << 6) ^ (h8 << 7);
+            size_t h1 = std::hash<float>()(std::round(v.x * 100000.0f));
+            size_t h2 = std::hash<float>()(std::round(v.y * 100000.0f));
+            size_t h3 = std::hash<float>()(std::round(v.z * 100000.0f));
+            size_t h4 = std::hash<float>()(std::round(v.u * 100000.0f));
+            size_t h5 = std::hash<float>()(std::round(v.v * 100000.0f));
+            return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4);
         }
     };
 
@@ -612,9 +607,8 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
             tinygltf::Primitive primitive;
             primitive.mode = 4;  // triangles
             
-            // 收集顶点、法线和索引数据
+            // 收集顶点和索引数据
             std::vector<float> positions;
-            std::vector<float> normals;
             std::vector<float> uvs;
             std::vector<unsigned int> indices;
 
@@ -636,21 +630,12 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
                     {(float)facetVec[i].vertex[2].x, (float)facetVec[i].vertex[2].y, (float)facetVec[i].vertex[2].z}
                 };
                 
-                // 计算面法线
-                float edge1[3] = {v[1][0] - v[0][0], v[1][1] - v[0][1], v[1][2] - v[0][2]};
-                float edge2[3] = {v[2][0] - v[0][0], v[2][1] - v[0][1], v[2][2] - v[0][2]};
-                float nx = edge1[1] * edge2[2] - edge1[2] * edge2[1];
-                float ny = edge1[2] * edge2[0] - edge1[0] * edge2[2];
-                float nz = edge1[0] * edge2[1] - edge1[1] * edge2[0];
-                float len = std::sqrt(nx * nx + ny * ny + nz * nz);
-                if (len > 1e-8f) { nx /= len; ny /= len; nz /= len; }
-                else { nx = 0; ny = 0; nz = 1.0f; }
                 
                 for (int j = 0; j < 3; j++) {
                     float x = v[j][0], y = v[j][1], z = v[j][2];
                     float u = (float)facetVec[i].uv[j].x, v_coord = (float)(-facetVec[i].uv[j].y);
                     
-                    VertexData vData = {x, y, z, nx, ny, nz, u, v_coord};
+                    VertexData vData = {x, y, z, u, v_coord};
                     auto it = vertexCache.find(vData);
                     if (it != vertexCache.end()) {
                         indices.push_back(it->second);
@@ -663,7 +648,6 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
                         posMax[0] = (std::max)(posMax[0], x); posMax[1] = (std::max)(posMax[1], y); posMax[2] = (std::max)(posMax[2], z);
                         
                         positions.push_back(x); positions.push_back(y); positions.push_back(z);
-                        normals.push_back(nx); normals.push_back(ny); normals.push_back(nz);
                         uvs.push_back(u); uvs.push_back(v_coord);
                     }
                 }
@@ -679,16 +663,6 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
                 acc.count = positions.size() / 3; acc.type = TINYGLTF_TYPE_VEC3;
                 acc.minValues = {posMin[0], posMin[1], posMin[2]}; acc.maxValues = {posMax[0], posMax[1], posMax[2]};
                 primitive.attributes["POSITION"] = model.accessors.size(); model.accessors.push_back(acc);
-            }
-            // NORMAL
-            {
-                tinygltf::BufferView bv; bv.buffer = 0; bv.byteOffset = model.buffers[0].data.size();
-                bv.byteLength = normals.size() * sizeof(float); bv.target = TINYGLTF_TARGET_ARRAY_BUFFER;
-                model.buffers[0].data.insert(model.buffers[0].data.end(), (uint8_t*)normals.data(), (uint8_t*)normals.data() + bv.byteLength);
-                int bvIdx = model.bufferViews.size(); model.bufferViews.push_back(bv);
-                tinygltf::Accessor acc; acc.bufferView = bvIdx; acc.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
-                acc.count = normals.size() / 3; acc.type = TINYGLTF_TYPE_VEC3;
-                primitive.attributes["NORMAL"] = model.accessors.size(); model.accessors.push_back(acc);
             }
             // UV
             if (!uvs.empty() && !item.first.imageUri.empty()) {
