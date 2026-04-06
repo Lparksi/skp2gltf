@@ -27,6 +27,7 @@
 #include "xmlgeomutils.h"
 #include "utils.h"
 #include "gltflib/gltfdraco.h"
+#include "texture_processor.h"
 
 
 #include <SketchUpAPI/import_export/pluginprogresscallback.h>
@@ -156,6 +157,7 @@ CXmlExporter::CXmlExporter()
 {
     SUSetInvalid(model_);
     SUSetInvalid(texture_writer_);
+    activeFacetMap_ = &facetMap;
 }
 
 CXmlExporter::~CXmlExporter() {}
@@ -365,16 +367,25 @@ void CXmlExporter::WriteMaterial(SUMaterialRef material)
 
 void CXmlExporter::WriteGeometry()
 {
-    SUTransformation transformation = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
     if (options_.export_faces() || options_.export_edges())
     {
-        // Write entities
-        SUEntitiesRef model_entities;
-        SU_CALL(SUModelGetEntities(model_, &model_entities));
         file_.StartGeometry();
         
-        // 使用批处理替代直接处理
-        ProcessGeometryBatch(model_entities, transformation, DEFAULT_BATCH_SIZE);
+        SUTransformation identity = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+        
+        // 1. Process the root entities
+        SUEntitiesRef model_entities;
+        SU_CALL(SUModelGetEntities(model_, &model_entities));
+        
+        // Root node
+        NodeInfo rootNode;
+        rootNode.name = "Root";
+        std::copy(identity.values, identity.values + 16, rootNode.matrix);
+        nodeList.push_back(rootNode);
+        int rootIdx = 0;
+
+        // activeFacetMap_ already points to this->facetMap by constructor
+        ProcessGeometryBatch(model_entities, identity, DEFAULT_BATCH_SIZE, rootIdx);
         
         // 确保处理完所有剩余数据
         faceBuffer.clear();
@@ -386,7 +397,8 @@ void CXmlExporter::WriteGeometry()
 
 void CXmlExporter::ProcessGeometryBatch(SUEntitiesRef entities, 
                                       const SUTransformation& transformation,
-                                      size_t batchSize) {
+                                      size_t batchSize,
+                                      int parentNodeIdx) {
     size_t num_faces = 0;
     size_t num_groups = 0;
     size_t num_instances = 0;
@@ -421,27 +433,28 @@ void CXmlExporter::ProcessGeometryBatch(SUEntitiesRef entities,
     } else {
         // 处理组和组件
         if (num_groups > 0) {
-            traversalGroupEntity(entities, transformation);
+            traversalGroupEntity(entities, transformation, parentNodeIdx);
         }
         
         if (num_instances > 0) {
-            getComponentEntity(entities, transformation);
+            getComponentEntity(entities, transformation, parentNodeIdx);
         }
     }
 }
 
-void CXmlExporter::WriteEntities(SUEntitiesRef entities, SUTransformation &transformation)
+void CXmlExporter::WriteEntities(SUEntitiesRef entities, SUTransformation &transformation, int parentNodeIdx)
 {
     if (SUIsInvalid(entities)) {
         return;
     }
     
     // 使用 ProcessGeometryBatch 统一处理所有实体
-    ProcessGeometryBatch(entities, transformation, DEFAULT_BATCH_SIZE);
+    ProcessGeometryBatch(entities, transformation, DEFAULT_BATCH_SIZE, parentNodeIdx);
 }
-void CXmlExporter::traversalGroupEntity(SUEntitiesRef entities, const SUTransformation &transformation)
+void CXmlExporter::traversalGroupEntity(SUEntitiesRef entities, const SUTransformation &transformation, int parentNodeIdx)
 {
-    // Groups
+    // Groups in SketchUp are essentially ComponentInstances under the hood.
+    // For simplicity, we can treat them similarly to instances or keep them as direct nodes.
     size_t num_groups = 0;
     SU_CALL(SUEntitiesGetNumGroups(entities, &num_groups));
     if (num_groups > 0)
@@ -450,14 +463,12 @@ void CXmlExporter::traversalGroupEntity(SUEntitiesRef entities, const SUTransfor
         SU_CALL(SUEntitiesGetGroups(entities, num_groups, &groups[0], &num_groups));
         for (size_t g = 0; g < num_groups; g++)
         {
-            SUGroupRef group                         = groups[g];
-            SUComponentDefinitionRef group_component = SU_INVALID;
-            SUEntitiesRef group_entities             = SU_INVALID;
-            SU_CALL(SUGroupGetEntities(group, &group_entities));
-            SUTransformation transforMation2   = {0};
-            SUTransformation resTransforMation = {0};
-            memset(resTransforMation.values, 0, sizeof(resTransforMation.values));
+            SUGroupRef group = groups[g];
+            SUTransformation transforMation2;
             SU_CALL(SUGroupGetTransform(group, &transforMation2));
+            
+            SUEntitiesRef group_entities = SU_INVALID;
+            SU_CALL(SUGroupGetEntities(group, &group_entities));
 
             SUDrawingElementRef drawing_element = SUGroupToDrawingElement(group);
             SULayerRef layer;
@@ -465,20 +476,27 @@ void CXmlExporter::traversalGroupEntity(SUEntitiesRef entities, const SUTransfor
             SUDrawingElementGetLayer(drawing_element, &layer);
             bool is_visible = true;
             SU_CALL(SULayerGetVisibility(layer, &is_visible));
+            
             if (is_visible)
             {
+                // Create a node for this group
+                NodeInfo node;
+                node.name = "Group_" + std::to_string(g);
+                std::copy(transforMation2.values, transforMation2.values + 16, node.matrix);
+                
+                int nodeIdx = nodeList.size();
+                nodeList.push_back(node);
+                nodeList[parentNodeIdx].children.push_back(nodeIdx);
+
                 inheritance_manager_.PushElement(group);
-                for (int kk = 0; kk < 4; kk++)
-                    for (int ii = 0; ii < 4; ii++)
-                        for (int jj = 0; jj < 4; jj++)
-                            resTransforMation.values[pos(ii, jj)] += transformation.values[pos(ii, kk)] * transforMation2.values[pos(kk, jj)];
-                WriteEntities(group_entities, resTransforMation);
+                // Groups keep the transformation context for their children if we're not instancing the group mesh itself
+                WriteEntities(group_entities, transformation, nodeIdx);
                 inheritance_manager_.PopElement();
             }
         }
     }
 }
-void CXmlExporter::getComponentEntity(SUEntitiesRef entities, const SUTransformation &transformation)
+void CXmlExporter::getComponentEntity(SUEntitiesRef entities, const SUTransformation &transformation, int parentNodeIdx)
 {
     size_t componentInstanceLen;
     SUEntitiesGetNumInstances(entities, &componentInstanceLen);
@@ -488,25 +506,16 @@ void CXmlExporter::getComponentEntity(SUEntitiesRef entities, const SUTransforma
         SUEntitiesGetInstances(entities, componentInstanceLen, &componentInstanceArr[0], &componentInstanceLen);
         for (size_t i = 0; i < componentInstanceLen; i++)
         {
-            /*
-                Get definition from instance of component
-            */
-            SUComponentDefinitionRef definitionOfInstance;
-            SUComponentInstanceGetDefinition(componentInstanceArr[i], &definitionOfInstance);
-            /*
-                Get entities from component definition
-            */
-            SUEntitiesRef entitiesInDefinition;
-            SUComponentDefinitionGetEntities(definitionOfInstance, &entitiesInDefinition);
-
-            SUTransformation transforMation2   = {0};
-            SUTransformation resTransforMation = {0};
-            memset(resTransforMation.values, 0, sizeof(resTransforMation.values));
-
-            SUComponentInstanceGetTransform(componentInstanceArr[i], &transforMation2);
-            transforMation2.values[12] = transforMation2.values[12] * ratio;
-            transforMation2.values[13] = transforMation2.values[13] * ratio;
-            transforMation2.values[14] = transforMation2.values[14] * ratio;
+            SUComponentDefinitionRef definition;
+            SUComponentInstanceGetDefinition(componentInstanceArr[i], &definition);
+            
+            SUTransformation instance_transform;
+            SUComponentInstanceGetTransform(componentInstanceArr[i], &instance_transform);
+            
+            // Adjust ratio for position
+            instance_transform.values[12] *= ratio;
+            instance_transform.values[13] *= ratio;
+            instance_transform.values[14] *= ratio;
 
             SUDrawingElementRef drawing_element = SUComponentInstanceToDrawingElement(componentInstanceArr[i]);
             SULayerRef layer;
@@ -514,15 +523,53 @@ void CXmlExporter::getComponentEntity(SUEntitiesRef entities, const SUTransforma
             SUDrawingElementGetLayer(drawing_element, &layer);
             bool is_visible = true;
             SU_CALL(SULayerGetVisibility(layer, &is_visible));
+            
             if (is_visible)
             {
                 inheritance_manager_.PushElement(componentInstanceArr[i]);
-                for (int kk = 0; kk < 4; kk++)
-                    for (int ii = 0; ii < 4; ii++)
-                        for (int jj = 0; jj < 4; jj++)
-                            resTransforMation.values[pos(ii, jj)] += transformation.values[pos(ii, kk)] * transforMation2.values[pos(kk, jj)];
-
-                WriteEntities(entitiesInDefinition, resTransforMation);
+                
+                // Create node
+                NodeInfo node;
+                std::copy(instance_transform.values, instance_transform.values + 16, node.matrix);
+                
+                // Check if mesh already exists for this definition
+                if (definitionToMeshIndex.count(definition.ptr)) {
+                    node.meshIndex = definitionToMeshIndex[definition.ptr];
+                } else {
+                    // Create new mesh for definition
+                    MeshInfo newMesh;
+                    int meshIdx = meshList.size();
+                    meshList.push_back(newMesh);
+                    definitionToMeshIndex[definition.ptr] = meshIdx;
+                    
+                    // Switch active facet map to the new mesh
+                    std::unordered_map<Color, std::vector<cFacet>, colorHashFuc>* oldFacetMap = activeFacetMap_;
+                    activeFacetMap_ = &meshList[meshIdx].facetMap;
+                    
+                    SUEntitiesRef def_entities = SU_INVALID;
+                    SUComponentDefinitionGetEntities(definition, &def_entities);
+                    
+                    SUTransformation identity = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+                    node.meshIndex = meshIdx;
+                    
+                    // We need a node locally to represent the definition's internal structure
+                    int nodeInMeshIdx = nodeList.size();
+                    NodeInfo defNode;
+                    defNode.name = "DefNode_" + std::to_string(meshIdx);
+                    std::copy(identity.values, identity.values + 16, defNode.matrix);
+                    nodeList.push_back(defNode);
+                    
+                    // Recursively process definition's entities
+                    ProcessGeometryBatch(def_entities, identity, DEFAULT_BATCH_SIZE, nodeInMeshIdx);
+                    
+                    // Restore active facet map
+                    activeFacetMap_ = oldFacetMap;
+                }
+                
+                int nodeIdx = nodeList.size();
+                nodeList.push_back(node);
+                nodeList[parentNodeIdx].children.push_back(nodeIdx);
+                
                 inheritance_manager_.PopElement();
             }
         }
@@ -537,289 +584,172 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
     model.scenes.push_back(scene);
     model.defaultScene = 0;
     
-    // 添加一个默认buffer用于存储所有数据
-    model.buffers.push_back(tinygltf::Buffer());
-    
-    struct VertexData {
-        float x, y, z;
-        float nx, ny, nz;
-        float u, v;
-
-        bool operator==(const VertexData& o) const {
-            return x == o.x && y == o.y && z == o.z &&
-                   nx == o.nx && ny == o.ny && nz == o.nz &&
-                   u == o.u && v == o.v;
-        }
-    };
-
-    struct VertexDataHash {
-        size_t operator()(const VertexData& v) const {
-            size_t h1 = std::hash<float>()(v.x);
-            size_t h2 = std::hash<float>()(v.y);
-            size_t h3 = std::hash<float>()(v.z);
-            size_t h4 = std::hash<float>()(v.nx);
-            size_t h5 = std::hash<float>()(v.ny);
-            size_t h6 = std::hash<float>()(v.nz);
-            size_t h7 = std::hash<float>()(v.u);
-            size_t h8 = std::hash<float>()(v.v);
-            return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4) ^ (h6 << 5) ^ (h7 << 6) ^ (h8 << 7);
-        }
-    };
-
-    for (auto &item : facetMap) {
+    // 定义一个辅助Lambda用于添加Mesh
+    auto addMeshLambda = [&](const std::unordered_map<Color, std::vector<cFacet>, colorHashFuc>& currentFacetMap, const std::string& meshName) -> int {
+        if (currentFacetMap.empty()) return -1;
+        
         tinygltf::Mesh mesh;
-        tinygltf::Primitive primitive;
-        primitive.mode = 4;  // triangles
+        mesh.name = meshName;
         
-        // 收集顶点、法线和索引数据
-        std::vector<float> positions;
-        std::vector<float> normals;
-        std::vector<float> uvs;
-        std::vector<unsigned int> indices;
-
-        // 顶点复用缓存
-        std::unordered_map<VertexData, unsigned int, VertexDataHash> vertexCache;
-
-        // 添加用于计算边界的变量
-        float posMin[3] = {FLT_MAX, FLT_MAX, FLT_MAX};
-        float posMax[3] = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
-        
-        std::vector<cFacet> &facetVec = item.second;
-        size_t vertexOffset = 0;
-        
-        for (size_t i = 0; i < facetVec.size(); i++) {
-            // 先提取三角形的三个顶点坐标
-            float v0[3] = {
-                static_cast<float>(facetVec[i].vertex[0].x),
-                static_cast<float>(facetVec[i].vertex[0].y),
-                static_cast<float>(facetVec[i].vertex[0].z)
-            };
-            float v1[3] = {
-                static_cast<float>(facetVec[i].vertex[1].x),
-                static_cast<float>(facetVec[i].vertex[1].y),
-                static_cast<float>(facetVec[i].vertex[1].z)
-            };
-            float v2[3] = {
-                static_cast<float>(facetVec[i].vertex[2].x),
-                static_cast<float>(facetVec[i].vertex[2].y),
-                static_cast<float>(facetVec[i].vertex[2].z)
-            };
+        for (auto &item : currentFacetMap) {
+            tinygltf::Primitive primitive;
+            primitive.mode = 4;  // triangles
             
-            // 计算面法线: normal = normalize(cross(v1-v0, v2-v0))
-            float edge1[3] = {v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]};
-            float edge2[3] = {v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]};
-            float nx = edge1[1] * edge2[2] - edge1[2] * edge2[1];
-            float ny = edge1[2] * edge2[0] - edge1[0] * edge2[2];
-            float nz = edge1[0] * edge2[1] - edge1[1] * edge2[0];
-            float len = std::sqrt(nx * nx + ny * ny + nz * nz);
-            if (len > 1e-8f) {
-                nx /= len;
-                ny /= len;
-                nz /= len;
-            } else {
-                // 退化三角形，使用默认法线
-                nx = 0.0f;
-                ny = 0.0f;
-                nz = 1.0f;
-            }
+            // 收集顶点、法线和索引数据
+            std::vector<float> positions;
+            std::vector<float> normals;
+            std::vector<float> uvs;
+            std::vector<unsigned int> indices;
+
+            // 顶点复用缓存
+            std::unordered_map<VertexData, unsigned int, VertexDataHash> vertexCache;
+
+            // 添加用于计算边界的变量
+            float posMin[3] = {FLT_MAX, FLT_MAX, FLT_MAX};
+            float posMax[3] = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
             
-            for (int j = 0; j < 3; j++) {
-                float x = static_cast<float>(facetVec[i].vertex[j].x);
-                float y = static_cast<float>(facetVec[i].vertex[j].y);
-                float z = static_cast<float>(facetVec[i].vertex[j].z);
+            const std::vector<cFacet> &facetVec = item.second;
+            size_t vertexOffset = 0;
+            
+            for (size_t i = 0; i < facetVec.size(); i++) {
+                // 先提取三角形的三个顶点坐标
+                float v[3][3] = {
+                    {(float)facetVec[i].vertex[0].x, (float)facetVec[i].vertex[0].y, (float)facetVec[i].vertex[0].z},
+                    {(float)facetVec[i].vertex[1].x, (float)facetVec[i].vertex[1].y, (float)facetVec[i].vertex[1].z},
+                    {(float)facetVec[i].vertex[2].x, (float)facetVec[i].vertex[2].y, (float)facetVec[i].vertex[2].z}
+                };
                 
-                float u = 0.0f;
-                float v = 0.0f;
-                if (!facetVec.empty()) {
-                    u = static_cast<float>(facetVec[i].uv[j].x);
-                    v = static_cast<float>(-facetVec[i].uv[j].y);
-                }
-
-                VertexData vData = {x, y, z, nx, ny, nz, u, v};
+                // 计算面法线
+                float edge1[3] = {v[1][0] - v[0][0], v[1][1] - v[0][1], v[1][2] - v[0][2]};
+                float edge2[3] = {v[2][0] - v[0][0], v[2][1] - v[0][1], v[2][2] - v[0][2]};
+                float nx = edge1[1] * edge2[2] - edge1[2] * edge2[1];
+                float ny = edge1[2] * edge2[0] - edge1[0] * edge2[2];
+                float nz = edge1[0] * edge2[1] - edge1[1] * edge2[0];
+                float len = std::sqrt(nx * nx + ny * ny + nz * nz);
+                if (len > 1e-8f) { nx /= len; ny /= len; nz /= len; }
+                else { nx = 0; ny = 0; nz = 1.0f; }
                 
-                auto it = vertexCache.find(vData);
-                if (it != vertexCache.end()) {
-                    // 复用已有顶点
-                    indices.push_back(it->second);
-                } else {
-                    // 记录新顶点
-                    unsigned int newIndex = vertexOffset++;
-                    vertexCache[vData] = newIndex;
-                    indices.push_back(newIndex);
+                for (int j = 0; j < 3; j++) {
+                    float x = v[j][0], y = v[j][1], z = v[j][2];
+                    float u = (float)facetVec[i].uv[j].x, v_coord = (float)(-facetVec[i].uv[j].y);
                     
-                    // 更新边界值
-                    posMin[0] = (std::min)(posMin[0], x);
-                    posMin[1] = (std::min)(posMin[1], y);
-                    posMin[2] = (std::min)(posMin[2], z);
-                    posMax[0] = (std::max)(posMax[0], x);
-                    posMax[1] = (std::max)(posMax[1], y);
-                    posMax[2] = (std::max)(posMax[2], z);
-                    
-                    positions.push_back(x);
-                    positions.push_back(y);
-                    positions.push_back(z);
-                    
-                    normals.push_back(nx);
-                    normals.push_back(ny);
-                    normals.push_back(nz);
-
-                    if (!facetVec.empty()) {
-                        uvs.push_back(u);
-                        uvs.push_back(v);
+                    VertexData vData = {x, y, z, nx, ny, nz, u, v_coord};
+                    auto it = vertexCache.find(vData);
+                    if (it != vertexCache.end()) {
+                        indices.push_back(it->second);
+                    } else {
+                        unsigned int newIndex = vertexOffset++;
+                        vertexCache[vData] = newIndex;
+                        indices.push_back(newIndex);
+                        
+                        posMin[0] = (std::min)(posMin[0], x); posMin[1] = (std::min)(posMin[1], y); posMin[2] = (std::min)(posMin[2], z);
+                        posMax[0] = (std::max)(posMax[0], x); posMax[1] = (std::max)(posMax[1], y); posMax[2] = (std::max)(posMax[2], z);
+                        
+                        positions.push_back(x); positions.push_back(y); positions.push_back(z);
+                        normals.push_back(nx); normals.push_back(ny); normals.push_back(nz);
+                        uvs.push_back(u); uvs.push_back(v_coord);
                     }
                 }
             }
-        }
 
-        // 创建并添加顶点位置buffer
-        {
-            tinygltf::BufferView bufferView;
-            bufferView.buffer = 0;
-            bufferView.byteOffset = model.buffers[0].data.size();
-            bufferView.byteLength = positions.size() * sizeof(float);
-            bufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
+            // POSITION
+            {
+                tinygltf::BufferView bv; bv.buffer = 0; bv.byteOffset = model.buffers[0].data.size();
+                bv.byteLength = positions.size() * sizeof(float); bv.target = TINYGLTF_TARGET_ARRAY_BUFFER;
+                model.buffers[0].data.insert(model.buffers[0].data.end(), (uint8_t*)positions.data(), (uint8_t*)positions.data() + bv.byteLength);
+                int bvIdx = model.bufferViews.size(); model.bufferViews.push_back(bv);
+                tinygltf::Accessor acc; acc.bufferView = bvIdx; acc.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
+                acc.count = positions.size() / 3; acc.type = TINYGLTF_TYPE_VEC3;
+                acc.minValues = {posMin[0], posMin[1], posMin[2]}; acc.maxValues = {posMax[0], posMax[1], posMax[2]};
+                primitive.attributes["POSITION"] = model.accessors.size(); model.accessors.push_back(acc);
+            }
+            // NORMAL
+            {
+                tinygltf::BufferView bv; bv.buffer = 0; bv.byteOffset = model.buffers[0].data.size();
+                bv.byteLength = normals.size() * sizeof(float); bv.target = TINYGLTF_TARGET_ARRAY_BUFFER;
+                model.buffers[0].data.insert(model.buffers[0].data.end(), (uint8_t*)normals.data(), (uint8_t*)normals.data() + bv.byteLength);
+                int bvIdx = model.bufferViews.size(); model.bufferViews.push_back(bv);
+                tinygltf::Accessor acc; acc.bufferView = bvIdx; acc.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
+                acc.count = normals.size() / 3; acc.type = TINYGLTF_TYPE_VEC3;
+                primitive.attributes["NORMAL"] = model.accessors.size(); model.accessors.push_back(acc);
+            }
+            // UV
+            if (!uvs.empty() && !item.first.imageUri.empty()) {
+                tinygltf::BufferView bv; bv.buffer = 0; bv.byteOffset = model.buffers[0].data.size();
+                bv.byteLength = uvs.size() * sizeof(float); bv.target = TINYGLTF_TARGET_ARRAY_BUFFER;
+                model.buffers[0].data.insert(model.buffers[0].data.end(), (uint8_t*)uvs.data(), (uint8_t*)uvs.data() + bv.byteLength);
+                int bvIdx = model.bufferViews.size(); model.bufferViews.push_back(bv);
+                tinygltf::Accessor acc; acc.bufferView = bvIdx; acc.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
+                acc.count = uvs.size() / 2; acc.type = TINYGLTF_TYPE_VEC2;
+                primitive.attributes["TEXCOORD_0"] = model.accessors.size(); model.accessors.push_back(acc);
+            }
+            // INDICES (Optimization: use USHORT if possible)
+            {
+                tinygltf::BufferView bv; bv.buffer = 0; bv.byteOffset = model.buffers[0].data.size();
+                if (vertexOffset < 65535) {
+                    std::vector<unsigned short> shortIndices(indices.begin(), indices.end());
+                    bv.byteLength = shortIndices.size() * sizeof(unsigned short);
+                    model.buffers[0].data.insert(model.buffers[0].data.end(), (uint8_t*)shortIndices.data(), (uint8_t*)shortIndices.data() + bv.byteLength);
+                } else {
+                    bv.byteLength = indices.size() * sizeof(unsigned int);
+                    model.buffers[0].data.insert(model.buffers[0].data.end(), (uint8_t*)indices.data(), (uint8_t*)indices.data() + bv.byteLength);
+                }
+                bv.target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
+                int bvIdx = model.bufferViews.size(); model.bufferViews.push_back(bv);
+                tinygltf::Accessor acc; acc.bufferView = bvIdx;
+                acc.componentType = (vertexOffset < 65535) ? TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT : TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT;
+                acc.count = indices.size(); acc.type = TINYGLTF_TYPE_SCALAR;
+                primitive.indices = model.accessors.size(); model.accessors.push_back(acc);
+            }
             
-            size_t bufferOffset = model.buffers[0].data.size();
-            model.buffers[0].data.resize(bufferOffset + bufferView.byteLength);
-            memcpy(model.buffers[0].data.data() + bufferOffset, positions.data(), bufferView.byteLength);
-            
-            int positionBufferViewIndex = model.bufferViews.size();
-            model.bufferViews.push_back(bufferView);
-            
-            tinygltf::Accessor accessor;
-            accessor.bufferView = positionBufferViewIndex;
-            accessor.byteOffset = 0;
-            accessor.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
-            accessor.count = positions.size() / 3;
-            accessor.type = TINYGLTF_TYPE_VEC3;
+            // MATERIAL
+            tinygltf::Material material;
+            material.pbrMetallicRoughness.baseColorFactor = {item.first.r, item.first.g, item.first.b, item.first.a};
+            material.name = item.first.name; material.pbrMetallicRoughness.metallicFactor = 0.0; material.pbrMetallicRoughness.roughnessFactor = 1.0;
+            if (!item.first.imageUri.empty()) {
+                std::string processedTexturePath = ProcessTexture(item.first.imageUri);
+                tinygltf::Image gltfImg; gltfImg.uri = processedTexturePath;
+                int imgIdx = model.images.size(); model.images.push_back(gltfImg);
+                tinygltf::Texture gltfTex; gltfTex.source = imgIdx;
+                int texIdx = model.textures.size(); model.textures.push_back(gltfTex);
+                material.pbrMetallicRoughness.baseColorTexture.index = texIdx;
+            }
+            primitive.material = model.materials.size(); model.materials.push_back(material);
+            mesh.primitives.push_back(primitive);
+        }
+        int meshIdx = model.meshes.size(); model.meshes.push_back(mesh);
+        return meshIdx;
+    };
 
-            // 设置边界值
-            accessor.minValues = {posMin[0], posMin[1], posMin[2]};
-            accessor.maxValues = {posMax[0], posMax[1], posMax[2]};
+    // 1. Add all constituent meshes
+    std::vector<int> modelMeshIndices;
+    for (size_t i = 0; i < meshList.size(); i++) {
+        modelMeshIndices.push_back(addMeshLambda(meshList[i].facetMap, "Mesh_" + std::to_string(i)));
+    }
+    
+    // 2. Add root mesh
+    int rootMeshIdx = addMeshLambda(facetMap, "RootMesh");
 
-            int positionAccessorIndex = model.accessors.size();
-            model.accessors.push_back(accessor);
-            
-            primitive.attributes["POSITION"] = positionAccessorIndex;
-        }
-
-        // 创建并添加法线buffer
-        {
-            tinygltf::BufferView bufferView;
-            bufferView.buffer = 0;
-            bufferView.byteOffset = model.buffers[0].data.size();
-            bufferView.byteLength = normals.size() * sizeof(float);
-            bufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
-            
-            size_t bufferOffset = model.buffers[0].data.size();
-            model.buffers[0].data.resize(bufferOffset + bufferView.byteLength);
-            memcpy(model.buffers[0].data.data() + bufferOffset, normals.data(), bufferView.byteLength);
-            
-            int normalBufferViewIndex = model.bufferViews.size();
-            model.bufferViews.push_back(bufferView);
-            
-            tinygltf::Accessor accessor;
-            accessor.bufferView = normalBufferViewIndex;
-            accessor.byteOffset = 0;
-            accessor.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
-            accessor.count = normals.size() / 3;
-            accessor.type = TINYGLTF_TYPE_VEC3;
-            
-            int normalAccessorIndex = model.accessors.size();
-            model.accessors.push_back(accessor);
-            
-            primitive.attributes["NORMAL"] = normalAccessorIndex;
-        }
-        
-        // 创建并添加UV buffer (如果有UV数据)
-        if (!uvs.empty() && !item.first.imageUri.empty()) {
-            tinygltf::BufferView bufferView;
-            bufferView.buffer = 0;
-            bufferView.byteOffset = model.buffers[0].data.size();
-            bufferView.byteLength = uvs.size() * sizeof(float);
-            bufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
-            
-            size_t bufferOffset = model.buffers[0].data.size();
-            model.buffers[0].data.resize(bufferOffset + bufferView.byteLength);
-            memcpy(model.buffers[0].data.data() + bufferOffset, uvs.data(), bufferView.byteLength);
-            
-            int uvBufferViewIndex = model.bufferViews.size();
-            model.bufferViews.push_back(bufferView);
-            
-            tinygltf::Accessor accessor;
-            accessor.bufferView = uvBufferViewIndex;
-            accessor.byteOffset = 0;
-            accessor.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
-            accessor.count = uvs.size() / 2;
-            accessor.type = TINYGLTF_TYPE_VEC2;
-            
-            int uvAccessorIndex = model.accessors.size();
-            model.accessors.push_back(accessor);
-            
-            primitive.attributes["TEXCOORD_0"] = uvAccessorIndex;
-        }
-        
-        // 创建并添加索引buffer
-        {
-            tinygltf::BufferView bufferView;
-            bufferView.buffer = 0;
-            bufferView.byteOffset = model.buffers[0].data.size();
-            bufferView.byteLength = indices.size() * sizeof(unsigned int);
-            bufferView.target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
-            
-            size_t bufferOffset = model.buffers[0].data.size();
-            model.buffers[0].data.resize(bufferOffset + bufferView.byteLength);
-            memcpy(model.buffers[0].data.data() + bufferOffset, indices.data(), bufferView.byteLength);
-            
-            int indexBufferViewIndex = model.bufferViews.size();
-            model.bufferViews.push_back(bufferView);
-            
-            tinygltf::Accessor accessor;
-            accessor.bufferView = indexBufferViewIndex;
-            accessor.byteOffset = 0;
-            accessor.componentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT;
-            accessor.count = indices.size();
-            accessor.type = TINYGLTF_TYPE_SCALAR;
-            
-            primitive.indices = model.accessors.size();
-            model.accessors.push_back(accessor);
-        }
-        
-        // 设置材质
-        tinygltf::Material material;
-        material.pbrMetallicRoughness.baseColorFactor = {
-            item.first.r, item.first.g, item.first.b, item.first.a
-        };
-        material.name = item.first.name;
-        material.pbrMetallicRoughness.metallicFactor = 0.0;
-        material.pbrMetallicRoughness.roughnessFactor = 1.0;
-        
-        if (!item.first.imageUri.empty()) {
-            std::string processedTexturePath = ProcessTexture(item.first.imageUri);
-            
-            tinygltf::Image gltfImage;
-            gltfImage.uri = processedTexturePath;
-            int imageIndex = model.images.size();
-            model.images.push_back(gltfImage);
-            
-            tinygltf::Texture gltfTexture;
-            gltfTexture.source = imageIndex;
-            int textureIndex = model.textures.size();
-            model.textures.push_back(gltfTexture);
-            
-            material.pbrMetallicRoughness.baseColorTexture.index = textureIndex;
-        }
-        
-        primitive.material = model.materials.size();
-        model.materials.push_back(material);
-        
-        mesh.primitives.push_back(primitive);
-        model.meshes.push_back(mesh);
-        
+    // 3. Add nodes and link to meshes
+    for (size_t i = 0; i < nodeList.size(); i++) {
         tinygltf::Node node;
-        node.mesh = model.meshes.size() - 1;
+        node.name = nodeList[i].name;
+        node.matrix = std::vector<double>(nodeList[i].matrix, nodeList[i].matrix + 16);
+        
+        if (nodeList[i].meshIndex >= 0 && (size_t)nodeList[i].meshIndex < modelMeshIndices.size()) {
+            node.mesh = modelMeshIndices[nodeList[i].meshIndex];
+        } else if (i == 0 && rootMeshIdx >= 0) {
+            // Apply root mesh to root node
+            node.mesh = rootMeshIdx;
+        }
+        
+        node.children = nodeList[i].children;
         model.nodes.push_back(node);
-        model.scenes[0].nodes.push_back(model.nodes.size() - 1);
+    }
+    
+    // Set scene root
+    if (!model.nodes.empty()) {
+        model.scenes[0].nodes.push_back(0); // 0 is the root node
     }
     
     tinygltf::TinyGLTF gltf;
@@ -1065,7 +995,7 @@ void CXmlExporter::WriteFace(SUFaceRef face, const SUTransformation &transformat
         // 添加到facetMap
         Color color1((double)color.r, (double)color.g, (double)color.b, 
                     (double)color.a, color.imageUri, color.name);
-        facetMap[color1].push_back(aFacet);
+        (*activeFacetMap_)[color1].push_back(aFacet);
     }
 
     // 清理本次处理的顶点缓存
@@ -1086,25 +1016,7 @@ void CXmlExporter::CompressAndResizeTextures() {
 }
 
 std::string CXmlExporter::ProcessTexture(const std::string& texturePath) {
-    // 检查缓存
-    if (textureCache.find(texturePath) != textureCache.end()) {
-        return textureCache[texturePath].compressedPath;
-    }
-
-    // 实现纹理压缩和缩放
-    CompressedTexture compressedInfo;
-    compressedInfo.originalPath = texturePath;
-    
-    // TODO: 使用图像处理库实现实际的压缩
-    // 这里需要添加实际的图像压缩代码
-    // 建议使用 stb_image 或 OpenCV 等库
-    
-    // 临时使用原始路径
-    compressedInfo.compressedPath = texturePath;
-    compressedInfo.isCompressed = false;
-    
-    textureCache[texturePath] = compressedInfo;
-    return compressedInfo.compressedPath;
+    return TextureProcessor::ProcessTexture(texturePath, 1024);
 }
 
 size_t CXmlExporter::GetOrCreateVertexIndex(const VertexKey& key) {
