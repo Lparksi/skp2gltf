@@ -15,6 +15,9 @@
 #include "xmloptions.h"
 #include "xmlstats.h"
 #include "xmlfile.h"
+#include <deque>
+#include <vector>
+#include <unordered_map>
 
 #include <SketchUpAPI/import_export/pluginprogresscallback.h>
 #include <SketchUpAPI/model/defs.h>
@@ -230,7 +233,7 @@ class CXmlExporter
     std::unordered_map<Color, std::vector<cFacet>, colorHashFuc>* activeFacetMap_ = nullptr;
     
     std::map<void*, int> definitionToMeshIndex;
-    std::vector<MeshInfo> meshList;
+    std::deque<MeshInfo> meshList;
     std::vector<NodeInfo> nodeList;
     std::string outPath;
     double ratio = 1;

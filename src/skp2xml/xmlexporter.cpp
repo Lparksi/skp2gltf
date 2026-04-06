@@ -489,8 +489,8 @@ void CXmlExporter::traversalGroupEntity(SUEntitiesRef entities, const SUTransfor
                 nodeList[parentNodeIdx].children.push_back(nodeIdx);
 
                 inheritance_manager_.PushElement(group);
-                // Groups keep the transformation context for their children if we're not instancing the group mesh itself
-                WriteEntities(group_entities, transformation, nodeIdx);
+                SUTransformation group_identity = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+                WriteEntities(group_entities, group_identity, nodeIdx);
                 inheritance_manager_.PopElement();
             }
         }
