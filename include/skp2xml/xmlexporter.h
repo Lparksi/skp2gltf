@@ -15,6 +15,9 @@
 #include "xmloptions.h"
 #include "xmlstats.h"
 #include "xmlfile.h"
+#include <deque>
+#include <vector>
+#include <unordered_map>
 
 #include <SketchUpAPI/import_export/pluginprogresscallback.h>
 #include <SketchUpAPI/model/defs.h>
@@ -101,6 +104,19 @@ class cFacet
         return v;
     }
 };
+
+struct MeshInfo {
+    std::unordered_map<Color, std::vector<cFacet>, colorHashFuc> facetMap;
+    std::string name;
+};
+
+struct NodeInfo {
+    int meshIndex = -1;
+    std::string name;
+    double matrix[16];
+    std::vector<int> children;
+};
+
 class CXmlExporter
 {
   public:
@@ -123,7 +139,7 @@ class CXmlExporter
 
     int exportToGltfImpl(const std::string &gltfName, const std::string &outputFormat, bool use_draco);
     void addFace(SUEntitiesRef entities, const SUTransformation &transformation);
-    void getComponentEntity(SUEntitiesRef entities, const SUTransformation &transformation);
+    void getComponentEntity(SUEntitiesRef entities, const SUTransformation &transformation, int parentNodeIdx);
 
   private:
     // Clean up slapi objects
@@ -141,8 +157,8 @@ class CXmlExporter
     void WriteComponentDefinition(SUComponentDefinitionRef comp_def);
 
     void WriteGeometry();
-    void WriteEntities(SUEntitiesRef entities, SUTransformation &transformation);
-    void traversalGroupEntity(SUEntitiesRef entities, const SUTransformation &transformation);
+    void WriteEntities(SUEntitiesRef entities, const SUTransformation &transformation, int parentNodeIdx);
+    void traversalGroupEntity(SUEntitiesRef entities, const SUTransformation &transformation, int parentNodeIdx);
     void WriteFace(SUFaceRef face, const SUTransformation &transformation);
     void WriteEdge(SUEdgeRef edge);
     void WriteCurve(SUCurveRef curve);
@@ -151,7 +167,7 @@ class CXmlExporter
     XmlEdgeInfo GetEdgeInfo(SUEdgeRef edge) const;
 
     // 添加新的辅助方法用于分批处理
-    void ProcessGeometryBatch(SUEntitiesRef entities, const SUTransformation& transformation, size_t batchSize);
+    void ProcessGeometryBatch(SUEntitiesRef entities, const SUTransformation& transformation, size_t batchSize, int parentNodeIdx);
     void FlushGeometryBatch();
     
     // 用于批处理的缓存
@@ -213,7 +229,12 @@ class CXmlExporter
     // File & stats
     CXmlFile file_;
     std::unordered_map<std::string, XmlMaterialInfo> materialMap;
-    std::unordered_map<Color, std::vector<cFacet>, colorHashFuc> facetMap;
+    std::unordered_map<Color, std::vector<cFacet>, colorHashFuc> facetMap; // Root mesh
+    std::unordered_map<Color, std::vector<cFacet>, colorHashFuc>* activeFacetMap_ = nullptr;
+    
+    std::map<void*, int> definitionToMeshIndex;
+    std::deque<MeshInfo> meshList;
+    std::vector<NodeInfo> nodeList;
     std::string outPath;
     double ratio = 1;
 };
