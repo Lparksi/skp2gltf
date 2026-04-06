@@ -442,7 +442,7 @@ void CXmlExporter::ProcessGeometryBatch(SUEntitiesRef entities,
     }
 }
 
-void CXmlExporter::WriteEntities(SUEntitiesRef entities, SUTransformation &transformation, int parentNodeIdx)
+void CXmlExporter::WriteEntities(SUEntitiesRef entities, const SUTransformation &transformation, int parentNodeIdx)
 {
     if (SUIsInvalid(entities)) {
         return;
@@ -577,6 +577,32 @@ void CXmlExporter::getComponentEntity(SUEntitiesRef entities, const SUTransforma
 }
 
 int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::string &outputFormat, bool use_draco) {
+    struct VertexData {
+        float x, y, z;
+        float nx, ny, nz;
+        float u, v;
+
+        bool operator==(const VertexData& o) const {
+            return x == o.x && y == o.y && z == o.z &&
+                   nx == o.nx && ny == o.ny && nz == o.nz &&
+                   u == o.u && v == o.v;
+        }
+    };
+
+    struct VertexDataHash {
+        size_t operator()(const VertexData& v) const {
+            size_t h1 = std::hash<float>()(v.x);
+            size_t h2 = std::hash<float>()(v.y);
+            size_t h3 = std::hash<float>()(v.z);
+            size_t h4 = std::hash<float>()(v.nx);
+            size_t h5 = std::hash<float>()(v.ny);
+            size_t h6 = std::hash<float>()(v.nz);
+            size_t h7 = std::hash<float>()(v.u);
+            size_t h8 = std::hash<float>()(v.v);
+            return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4) ^ (h6 << 5) ^ (h7 << 6) ^ (h8 << 7);
+        }
+    };
+
     tinygltf::Model model;
     model.asset.version = "2.0";
     model.asset.generator = "zhuzhaoyun";

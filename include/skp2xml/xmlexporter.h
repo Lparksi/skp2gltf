@@ -136,7 +136,7 @@ class CXmlExporter
 
     int exportToGltfImpl(const std::string &gltfName, const std::string &outputFormat, bool use_draco);
     void addFace(SUEntitiesRef entities, const SUTransformation &transformation);
-    void getComponentEntity(SUEntitiesRef entities, const SUTransformation &transformation);
+    void getComponentEntity(SUEntitiesRef entities, const SUTransformation &transformation, int parentNodeIdx);
 
   private:
     // Clean up slapi objects
@@ -154,7 +154,7 @@ class CXmlExporter
     void WriteComponentDefinition(SUComponentDefinitionRef comp_def);
 
     void WriteGeometry();
-    void WriteEntities(SUEntitiesRef entities, SUTransformation &transformation, int parentNodeIdx);
+    void WriteEntities(SUEntitiesRef entities, const SUTransformation &transformation, int parentNodeIdx);
     void traversalGroupEntity(SUEntitiesRef entities, const SUTransformation &transformation, int parentNodeIdx);
     void WriteFace(SUFaceRef face, const SUTransformation &transformation);
     void WriteEdge(SUEdgeRef edge);
