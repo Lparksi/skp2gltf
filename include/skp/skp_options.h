@@ -1,11 +1,11 @@
 // Copyright 2013 Trimble Navigation Limited. All Rights Reserved.
 
-#ifndef SKPTOXML_COMMON_XMLOPTIONS_H
-#define SKPTOXML_COMMON_XMLOPTIONS_H
+#ifndef SKPTOXML_COMMON_SKPOPTIONS_H
+#define SKPTOXML_COMMON_SKPOPTIONS_H
 
-class CXmlOptions {
+class CSkpOptions {
  public:
-  CXmlOptions(void) {
+  CSkpOptions(void) {
    export_materials_ = true;
    export_faces_ = true;
    export_edges_ = true;
@@ -14,7 +14,7 @@ class CXmlOptions {
    export_options_ = false;
   }
 
-  virtual ~CXmlOptions(void) {}
+  virtual ~CSkpOptions(void) {}
 
   inline bool export_materials() const { return export_materials_; }
   inline void set_export_materials(bool value) { export_materials_ = value; }
@@ -47,4 +47,4 @@ class CXmlOptions {
   bool export_options_;
 };
 
-#endif // SKPTOXML_COMMON_XMLOPTIONS_H
+#endif // SKPTOXML_COMMON_SKPOPTIONS_H

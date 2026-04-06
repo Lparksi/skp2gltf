@@ -2,26 +2,57 @@
  * @Description:
  * @Author: yaol
  * @Date: 2021-08-06 10:22:27
- * @LastEditTime: 2021-08-06 15:02:30
- * @LastEditors: yaol
- * @FilePath: \common\xmlexporter.h
+ * @LastEditTime: 2026-04-06 09:04:41
+ * @LastEditors: Antigravity
+ * @FilePath: include/skp/skp_exporter.h
  */
 // Copyright 2013 Trimble Navigation Limited. All Rights Reserved.
 
-#ifndef SKPTOXML_COMMON_XMLEXPORTER_H
-#define SKPTOXML_COMMON_XMLEXPORTER_H
+#ifndef SKPTOXML_COMMON_SKPEXPORTER_H
+#define SKPTOXML_COMMON_SKPEXPORTER_H
 
-#include "xmlinheritancemanager.h"
-#include "xmloptions.h"
-#include "xmlstats.h"
-#include "xmlfile.h"
+#include "skp_stats.h"
+#include "skp_options.h"
+#include "skp_inheritance_manager.h"
 #include <deque>
 #include <vector>
 #include <unordered_map>
+#include <map>
+#include <string>
 
 #include <SketchUpAPI/import_export/pluginprogresscallback.h>
 #include <SketchUpAPI/model/defs.h>
-#include "gltflib/creategltfcommon.h"
+#include <SketchUpAPI/model/transformation.h>
+#include <SketchUpAPI/model/color.h>
+
+struct SkpMaterialInfo {
+    std::string name_;
+    bool has_color_;
+    SUColor color_;
+    bool has_alpha_;
+    double alpha_;
+    bool has_texture_;
+    std::string texture_path_;
+    std::string picture_name_;
+    double texture_sscale_;
+    double texture_tscale_;
+};
+
+struct SkpFaceInfo {
+    std::string layer_name_;
+    std::string front_mat_name_;
+    std::string back_mat_name_;
+    bool has_front_texture_;
+    bool has_back_texture_;
+    bool has_single_loop_;
+};
+
+struct SkpEdgeInfo {
+    std::string layer_name_;
+    std::string mat_name_;
+    bool has_single_loop_;
+};
+
 class Color
 {
   public:
@@ -117,25 +148,23 @@ struct NodeInfo {
     std::vector<int> children;
 };
 
-class CXmlExporter
+class CSkpExporter
 {
   public:
-    CXmlExporter();
-    virtual ~CXmlExporter();
+    CSkpExporter();
+    virtual ~CSkpExporter();
 
     // Convert
     bool Convert(const std::string &from_file,
+                 const std::string &file_path,
                  const std::string &file_name,
-                 const std::string &to_file,
                  const std::string &output_format,
                  bool use_draco,
                  SketchUpPluginProgressCallback *callback);
 
     // Set user options
-    void SetOptions(const CXmlOptions &options) { options_ = options; }
-
-    // Get stats
-    const CXmlExportStats &stats() const { return stats_; }
+    CSkpOptions &options() { return options_; }
+    CSkpExportStats &stats() { return stats_; }
 
     int exportToGltfImpl(const std::string &gltfName, const std::string &outputFormat, bool use_draco);
     void addFace(SUEntitiesRef entities, const SUTransformation &transformation);
@@ -144,17 +173,9 @@ class CXmlExporter
   private:
     // Clean up slapi objects
     void ReleaseModelObjects();
-    // Write texture files to the destination directory
-    void WriteTextureFiles();
-
-    void WriteLayers();
-    void WriteLayer(SULayerRef layer);
 
     void WriteMaterials();
     void WriteMaterial(SUMaterialRef material);
-
-    void WriteComponentDefinitions();
-    void WriteComponentDefinition(SUComponentDefinitionRef comp_def);
 
     void WriteGeometry();
     void WriteEntities(SUEntitiesRef entities, const SUTransformation &transformation, int parentNodeIdx);
@@ -162,22 +183,19 @@ class CXmlExporter
     void WriteFace(SUFaceRef face, const SUTransformation &transformation);
     void WriteEdge(SUEdgeRef edge);
     void WriteCurve(SUCurveRef curve);
-    void addFaces(XmlFaceInfo &info, const SUTransformation &transformation);
-
-    XmlEdgeInfo GetEdgeInfo(SUEdgeRef edge) const;
+    void addFaces(const SUTransformation &transformation);
 
     // 添加新的辅助方法用于分批处理
     void ProcessGeometryBatch(SUEntitiesRef entities, const SUTransformation& transformation, size_t batchSize, int parentNodeIdx);
-    void FlushGeometryBatch();
     
     // 用于批处理的缓存
     std::vector<SUFaceRef> faceBuffer;
-    static const size_t DEFAULT_BATCH_SIZE = 1000; // 可以根据实际情况调整
+    static const size_t DEFAULT_BATCH_SIZE = 1000;
 
     // 用于顶点去重的结构
     struct VertexKey {
         double x, y, z;
-        double u, v;  // UV coordinates
+        double u, v;  
         
         bool operator<(const VertexKey& other) const {
             const double EPSILON = 1e-7;
@@ -211,24 +229,17 @@ class CXmlExporter
     void ClearVertexCache();
 
   private:
-    CXmlOptions options_;
-
-    // Export statistics. Filled in by this exporters class and used later by
-    // the platform specific plugin classes to populate the results dialog.
-    CXmlExportStats stats_;
+    CSkpOptions options_;
+    CSkpExportStats stats_;
 
     // SLAPI model and texture writer
     SUModelRef model_;
     SUTextureWriterRef texture_writer_;
 
     // Stack
-    CInheritanceManager inheritance_manager_;
+    CSkpInheritanceManager inheritance_manager_;
 
-    //    std::unordered_map<Color, std::vector<cFacet>, colorHashFuc> facetMap;
-
-    // File & stats
-    CXmlFile file_;
-    std::unordered_map<std::string, XmlMaterialInfo> materialMap;
+    std::unordered_map<std::string, SkpMaterialInfo> materialMap;
     std::unordered_map<Color, std::vector<cFacet>, colorHashFuc> facetMap; // Root mesh
     std::unordered_map<Color, std::vector<cFacet>, colorHashFuc>* activeFacetMap_ = nullptr;
     
@@ -239,4 +250,4 @@ class CXmlExporter
     double ratio = 1;
 };
 
-#endif  // SKPTOXML_COMMON_XMLEXPORTER_H
+#endif  // SKPTOXML_COMMON_SKPEXPORTER_H

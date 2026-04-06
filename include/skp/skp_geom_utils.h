@@ -1,14 +1,16 @@
 // Copyright 2013 Trimble Navigation Limited. All Rights Reserved.
 
-#ifndef SKPTOXML_COMMON_XMLGEOMUTILS_H
-#define SKPTOXML_COMMON_XMLGEOMUTILS_H
+#ifndef SKPTOXML_COMMON_SKPGEOMUTILS_H
+#define SKPTOXML_COMMON_SKPGEOMUTILS_H
 
+#include <vector>
+#include <math.h>
 #include <SketchUpAPI/geometry.h>
 
 // This module defines geometric classes that are useful in processing
 // the objects coming from SketchUp.
 
-namespace XmlGeomUtils {
+namespace SkpGeomUtils {
 
 // Vector Class----------------------------------------
 class CVector3d {

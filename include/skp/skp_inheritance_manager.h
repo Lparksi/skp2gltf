@@ -8,23 +8,23 @@
  */
 // Copyright 2013 Trimble Navigation Limited. All Rights Reserved.
 
-#ifndef SKPTOXML_COMMON_XMLINHERITANCEMANAGER_H
-#define SKPTOXML_COMMON_XMLINHERITANCEMANAGER_H
+#ifndef SKPTOXML_COMMON_SKPINHERITANCEMANAGER_H
+#define SKPTOXML_COMMON_SKPINHERITANCEMANAGER_H
 
-#include "xmlgeomutils.h"
+#include "skp_geom_utils.h"
 #include <SketchUpAPI/color.h>
 #include <SketchUpAPI/model/defs.h>
 #include <vector>
 
-// CInheritanceManager - A cross-platform class that manages the properties
+// CSkpInheritanceManager - A cross-platform class that manages the properties
 // of geometric elements (faces and edges) that can be inherited from component
 // instances, groups and images.  These properties are transformations to world
 // space, layers and materials.
-class CInheritanceManager {
+class CSkpInheritanceManager {
  public:
-  CInheritanceManager();
-  CInheritanceManager(bool bMaterialsByLayer);
-  virtual ~CInheritanceManager();
+  CSkpInheritanceManager();
+  CSkpInheritanceManager(bool bMaterialsByLayer);
+  virtual ~CSkpInheritanceManager();
 
   void PushElement(SUGroupRef element);
   void PushElement(SUImageRef element);
@@ -51,4 +51,4 @@ class CInheritanceManager {
   std::vector<SUColor> edge_colors_;
 };
 
-#endif // SKPTOXML_COMMON_XMLINHERITANCEMANAGER_H
+#endif // SKPTOXML_COMMON_SKPINHERITANCEMANAGER_H

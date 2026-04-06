@@ -19,9 +19,7 @@
 #include <string>
 #include <algorithm>
 #include <cctype>
-#include "skp2xml/xmlexporter.h"
-#include "tinyxml2/tinyxml2.h"
-#include "skp2xml/xmlexporter.h"
+#include "skp/skp_exporter.h"
 
 static std::string ToLowerCopy(std::string value)
 {
@@ -121,13 +119,13 @@ int main(int argc, char **argv)
         gltf_file = output_dir + output_arg;
     }
 
-    CXmlExporter cXmlExporter;
+    CSkpExporter cSkpExporter;
     std::cout << "Start conversion" << std::endl;
 
     // C:\model\allRvtFile\skp\67beca5e7d1b0078ee8c7fee.skp 
     // C:\model\model\skp\67beca5e7d1b0078ee8c7fee\ 
     // C:\model\model\skp\67beca5e7d1b0078ee8c7fee
-    const bool ok = cXmlExporter.Convert(skp_file, output_dir, gltf_file, output_format, use_draco, nullptr);
+    const bool ok = cSkpExporter.Convert(skp_file, output_dir, gltf_file, output_format, use_draco, nullptr);
     if (ok)
     {
         std::cout << "finished" << std::endl;
