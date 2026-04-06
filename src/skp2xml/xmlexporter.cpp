@@ -407,38 +407,26 @@ void CXmlExporter::ProcessGeometryBatch(SUEntitiesRef entities,
     SU_CALL(SUEntitiesGetNumGroups(entities, &num_groups));
     SU_CALL(SUEntitiesGetNumInstances(entities, &num_instances));
     
-    // std::cout << "Processing entity with:" << std::endl;
-    // std::cout << "- Faces: " << num_faces << std::endl;
-    // std::cout << "- Groups: " << num_groups << std::endl; 
-    // std::cout << "- Instances: " << num_instances << std::endl;
-    
-    // 处理直接的面
+    // 1. 处理面 (非批处理，一次性获取指针以保证逻辑正确)
     if (num_faces > 0) {
-        std::vector<SUFaceRef> faces(std::min<size_t>(batchSize, num_faces));
+        std::vector<SUFaceRef> faces(num_faces);
+        size_t actual_count = 0;
+        SU_CALL(SUEntitiesGetFaces(entities, num_faces, &faces[0], &actual_count));
         
-        for (size_t offset = 0; offset < num_faces; offset += batchSize) {
-            size_t currentBatchSize = std::min<size_t>(batchSize, num_faces - offset);
-            faces.resize(currentBatchSize);
-            
-            SU_CALL(SUEntitiesGetFaces(entities, currentBatchSize, &faces[0], &currentBatchSize));
-            
-            for (size_t i = 0; i < currentBatchSize; i++) {
-                inheritance_manager_.PushElement(faces[i]);
-                WriteFace(faces[i], transformation);
-                inheritance_manager_.PopElement();
-            }
+        for (size_t i = 0; i < actual_count; i++) {
+            inheritance_manager_.PushElement(faces[i]);
+            WriteFace(faces[i], transformation);
+            inheritance_manager_.PopElement();
         }
-        faces.clear();
-        faces.shrink_to_fit();
-    } else {
-        // 处理组和组件
-        if (num_groups > 0) {
-            traversalGroupEntity(entities, transformation, parentNodeIdx);
-        }
-        
-        if (num_instances > 0) {
-            getComponentEntity(entities, transformation, parentNodeIdx);
-        }
+    }
+    
+    // 2. 处理组和组件 (移除 else 分支，确保全部处理)
+    if (num_groups > 0) {
+        traversalGroupEntity(entities, transformation, parentNodeIdx);
+    }
+    
+    if (num_instances > 0) {
+        getComponentEntity(entities, transformation, parentNodeIdx);
     }
 }
 
@@ -609,6 +597,9 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
     tinygltf::Scene scene;
     model.scenes.push_back(scene);
     model.defaultScene = 0;
+    
+    // 初始化缓冲区，避免后续访问 model.buffers[0] 越界
+    model.buffers.emplace_back();
     
     // 定义一个辅助Lambda用于添加Mesh
     auto addMeshLambda = [&](const std::unordered_map<Color, std::vector<cFacet>, colorHashFuc>& currentFacetMap, const std::string& meshName) -> int {
@@ -869,14 +860,16 @@ void CXmlExporter::WriteFace(SUFaceRef face, const SUTransformation &transformat
     size_t num_triangles = 0;
     SU_CALL(SUMeshHelperGetNumTriangles(mesh_ref, &num_triangles));
 
-    std::vector<SUVector3D> normalArr(num_triangles);
-    size_t num_normals = 0;
-    SUMeshHelperGetNormals(mesh_ref, num_triangles, &normalArr[0], &num_normals);
-
     const size_t num_indices = 3 * num_triangles;
     size_t num_retrieved     = 0;
     std::vector<size_t> indices(num_indices);
-    SU_CALL(SUMeshHelperGetVertexIndices(mesh_ref, num_indices, &indices[0], &num_retrieved));
+    std::vector<SUVector3D> normalArr(num_triangles);
+    
+    if (num_triangles > 0) {
+        size_t num_normals = 0;
+        SUMeshHelperGetNormals(mesh_ref, num_triangles, &normalArr[0], &num_normals);
+        SU_CALL(SUMeshHelperGetVertexIndices(mesh_ref, num_indices, &indices[0], &num_retrieved));
+    }
 
     // Get UV coords.
     std::vector<SUPoint3D> front_stq(num_vertices);
