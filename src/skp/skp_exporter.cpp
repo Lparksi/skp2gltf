@@ -553,29 +553,34 @@ void CSkpExporter::getComponentEntity(SUEntitiesRef entities, const SUTransforma
 }
 
 int CSkpExporter::exportToGltfImpl(const std::string &gltfName, const std::string &outputFormat, bool use_draco) {
+    const float weldEpsilon = static_cast<float>(options_.vertex_weld_epsilon());
+    const float invEpsilon = 1.0f / weldEpsilon;
+    
     struct VertexData {
         float x, y, z;
         float nx, ny, nz;
         float u, v;
+        int gridX, gridY, gridZ;
 
         bool operator==(const VertexData& o) const {
-            return x == o.x && y == o.y && z == o.z &&
-                   nx == o.nx && ny == o.ny && nz == o.nz &&
-                   u == o.u && v == o.v;
+            return gridX == o.gridX && gridY == o.gridY && gridZ == o.gridZ &&
+                   std::abs(nx - o.nx) < 0.01f &&
+                   std::abs(ny - o.ny) < 0.01f &&
+                   std::abs(nz - o.nz) < 0.01f &&
+                   std::abs(u - o.u) < 0.001f &&
+                   std::abs(v - o.v) < 0.001f;
         }
     };
 
     struct VertexDataHash {
         size_t operator()(const VertexData& v) const {
-            size_t h1 = std::hash<float>()(v.x);
-            size_t h2 = std::hash<float>()(v.y);
-            size_t h3 = std::hash<float>()(v.z);
+            size_t h1 = std::hash<int>()(v.gridX);
+            size_t h2 = std::hash<int>()(v.gridY);
+            size_t h3 = std::hash<int>()(v.gridZ);
             size_t h4 = std::hash<float>()(v.nx);
             size_t h5 = std::hash<float>()(v.ny);
             size_t h6 = std::hash<float>()(v.nz);
-            size_t h7 = std::hash<float>()(v.u);
-            size_t h8 = std::hash<float>()(v.v);
-            return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4) ^ (h6 << 5) ^ (h7 << 6) ^ (h8 << 7);
+            return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4) ^ (h6 << 5);
         }
     };
 
@@ -667,12 +672,15 @@ int CSkpExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
                     float u = (float)facet.uv[j].x;
                     float v_coord = (float)(-facet.uv[j].y);
                     
-                    // 使用平滑法线
                     Pos p = {x, y, z};
                     const auto& sn = normalizedNormals[p];
                     float nx = sn[0], ny = sn[1], nz = sn[2];
 
-                    VertexData vData = {x, y, z, nx, ny, nz, u, v_coord};
+                    int gridX = static_cast<int>(std::floor(x * invEpsilon));
+                    int gridY = static_cast<int>(std::floor(y * invEpsilon));
+                    int gridZ = static_cast<int>(std::floor(z * invEpsilon));
+
+                    VertexData vData = {x, y, z, nx, ny, nz, u, v_coord, gridX, gridY, gridZ};
                     auto it = vertexCache.find(vData);
                     if (it != vertexCache.end()) {
                         indices.push_back(it->second);
@@ -722,23 +730,36 @@ int CSkpExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
                 acc.count = uvs.size() / 2; acc.type = TINYGLTF_TYPE_VEC2;
                 primitive.attributes["TEXCOORD_0"] = model.accessors.size(); model.accessors.push_back(acc);
             }
-            // INDICES (Optimization: use USHORT if possible)
+            // INDICES (Optimization: use smallest possible type)
             {
                 tinygltf::BufferView bv; bv.buffer = 0; bv.byteOffset = model.buffers[0].data.size();
-                if (vertexOffset < 65535) {
+                bv.target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
+                
+                if (vertexOffset < 256) {
+                    std::vector<unsigned char> byteIndices(indices.begin(), indices.end());
+                    bv.byteLength = byteIndices.size() * sizeof(unsigned char);
+                    model.buffers[0].data.insert(model.buffers[0].data.end(), (uint8_t*)byteIndices.data(), (uint8_t*)byteIndices.data() + bv.byteLength);
+                    tinygltf::Accessor acc; acc.bufferView = model.bufferViews.size();
+                    acc.componentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
+                    acc.count = indices.size(); acc.type = TINYGLTF_TYPE_SCALAR;
+                    primitive.indices = model.accessors.size(); model.accessors.push_back(acc);
+                } else if (vertexOffset < 65535) {
                     std::vector<unsigned short> shortIndices(indices.begin(), indices.end());
                     bv.byteLength = shortIndices.size() * sizeof(unsigned short);
                     model.buffers[0].data.insert(model.buffers[0].data.end(), (uint8_t*)shortIndices.data(), (uint8_t*)shortIndices.data() + bv.byteLength);
+                    tinygltf::Accessor acc; acc.bufferView = model.bufferViews.size();
+                    acc.componentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;
+                    acc.count = indices.size(); acc.type = TINYGLTF_TYPE_SCALAR;
+                    primitive.indices = model.accessors.size(); model.accessors.push_back(acc);
                 } else {
                     bv.byteLength = indices.size() * sizeof(unsigned int);
                     model.buffers[0].data.insert(model.buffers[0].data.end(), (uint8_t*)indices.data(), (uint8_t*)indices.data() + bv.byteLength);
+                    tinygltf::Accessor acc; acc.bufferView = model.bufferViews.size();
+                    acc.componentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT;
+                    acc.count = indices.size(); acc.type = TINYGLTF_TYPE_SCALAR;
+                    primitive.indices = model.accessors.size(); model.accessors.push_back(acc);
                 }
-                bv.target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
-                int bvIdx = model.bufferViews.size(); model.bufferViews.push_back(bv);
-                tinygltf::Accessor acc; acc.bufferView = bvIdx;
-                acc.componentType = (vertexOffset < 65535) ? TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT : TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT;
-                acc.count = indices.size(); acc.type = TINYGLTF_TYPE_SCALAR;
-                primitive.indices = model.accessors.size(); model.accessors.push_back(acc);
+                model.bufferViews.push_back(bv);
             }
             
             // MATERIAL
@@ -831,8 +852,14 @@ int CSkpExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
     if (ret && use_draco) {
         std::cout << "Starting Draco compression..." << std::endl;
         gltf::GltfDraco dracoTool(&model);
-        // speed=10, bits: pos=11, tex=10, normal=8, color=8, generic=8
-        dracoTool.encode(10, 11, 10, 8, 8, 8);
+        dracoTool.encode(
+            options_.draco_speed(),
+            options_.draco_position_bits(),
+            options_.draco_tex_bits(),
+            options_.draco_normal_bits(),
+            options_.draco_color_bits(),
+            options_.draco_generic_bits()
+        );
         
         // Save again with Draco extension
         ret = gltf.WriteGltfSceneToFile(&model, outputPath,
@@ -1057,7 +1084,7 @@ void CSkpExporter::CompressAndResizeTextures() {
 }
 
 std::string CSkpExporter::ProcessTexture(const std::string& texturePath) {
-    return TextureProcessor::ProcessTexture(texturePath, 1024);
+    return TextureProcessor::ProcessTexture(texturePath, options_.texture_max_resolution());
 }
 
 size_t CSkpExporter::GetOrCreateVertexIndex(const VertexKey& key) {
