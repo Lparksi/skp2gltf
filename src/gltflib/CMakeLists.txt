@@ -15,6 +15,7 @@ add_library(gltflib
 target_include_directories(gltflib PUBLIC
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/include/gltflib
+    ${PROJECT_SOURCE_DIR}/thirdparty
     ${PROJECT_SOURCE_DIR}/thirdparty/tinygltf
 )
 

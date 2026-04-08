@@ -43,6 +43,12 @@ set(DRACO_MESH_COMPRESSION ON CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(draco)
 
+# 显式将 draco 的头文件路径添加到其接口中，以便链接它的目标能正确获取包含路径
+target_include_directories(draco INTERFACE 
+    ${draco_SOURCE_DIR}/src
+    ${CMAKE_BINARY_DIR}
+)
+
 # 添加子目录
 add_subdirectory(src/gltflib)
 add_subdirectory(src/skp)
