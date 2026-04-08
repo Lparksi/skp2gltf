@@ -19,6 +19,7 @@
 #include <unordered_map>
 #include <map>
 #include <string>
+#include <functional>
 
 #include <SketchUpAPI/import_export/pluginprogresscallback.h>
 #include <SketchUpAPI/model/defs.h>
@@ -165,6 +166,8 @@ class CSkpExporter
     // Set user options
     CSkpOptions &options() { return options_; }
     CSkpExportStats &stats() { return stats_; }
+    
+    std::string GetMetadataJson(const std::string& src_file);
 
     int exportToGltfImpl(const std::string &gltfName, const std::string &outputFormat, bool use_draco);
     void addFace(SUEntitiesRef entities, const SUTransformation &transformation);
@@ -197,18 +200,29 @@ class CSkpExporter
         double x, y, z;
         double u, v;  
         
-        bool operator<(const VertexKey& other) const {
+        bool operator==(const VertexKey& other) const {
             const double EPSILON = 1e-7;
-            if (std::abs(x - other.x) > EPSILON) return x < other.x;
-            if (std::abs(y - other.y) > EPSILON) return y < other.y;
-            if (std::abs(z - other.z) > EPSILON) return z < other.z;
-            if (std::abs(u - other.u) > EPSILON) return u < other.u;
-            return v < other.v;
+            return std::abs(x - other.x) < EPSILON &&
+                   std::abs(y - other.y) < EPSILON &&
+                   std::abs(z - other.z) < EPSILON &&
+                   std::abs(u - other.u) < EPSILON &&
+                   std::abs(v - other.v) < EPSILON;
+        }
+    };
+
+    struct VertexKeyHash {
+        size_t operator()(const VertexKey& k) const {
+            auto h1 = std::hash<double>{}(k.x);
+            auto h2 = std::hash<double>{}(k.y);
+            auto h3 = std::hash<double>{}(k.z);
+            auto h4 = std::hash<double>{}(k.u);
+            auto h5 = std::hash<double>{}(k.v);
+            return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4);
         }
     };
 
     // 顶点缓存
-    std::map<VertexKey, size_t> vertexCache;
+    std::unordered_map<VertexKey, size_t, VertexKeyHash> vertexCache;
     std::vector<VertexKey> uniqueVertices;
     
     // 用于存储压缩后的纹理信息
@@ -220,17 +234,20 @@ class CSkpExporter
         bool isCompressed;
     };
     
-    std::map<std::string, CompressedTexture> textureCache;
+    std::unordered_map<std::string, CompressedTexture> textureCache;
     
     // 新增的辅助方法
     void CompressAndResizeTextures();
     std::string ProcessTexture(const std::string& texturePath);
     size_t GetOrCreateVertexIndex(const VertexKey& key);
     void ClearVertexCache();
+    void LoadMaterialConfig(const std::string& config_path);
+    void ApplyPbrMapping(const std::string& mat_name, float& metallic, float& roughness);
 
   private:
     CSkpOptions options_;
     CSkpExportStats stats_;
+    nlohmann::json material_config_;
 
     // SLAPI model and texture writer
     SUModelRef model_;
@@ -243,7 +260,7 @@ class CSkpExporter
     std::unordered_map<Color, std::vector<cFacet>, colorHashFuc> facetMap; // Root mesh
     std::unordered_map<Color, std::vector<cFacet>, colorHashFuc>* activeFacetMap_ = nullptr;
     
-    std::map<void*, int> definitionToMeshIndex;
+    std::unordered_map<void*, int> definitionToMeshIndex;
     std::deque<MeshInfo> meshList;
     std::vector<NodeInfo> nodeList;
     std::string outPath;

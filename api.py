@@ -105,6 +105,38 @@ async def run_conversion(
     return True, stdout.decode()
 
 
+async def run_metadata(input_path: str):
+    arch = os.uname().machine
+    is_arm64 = arch in ["aarch64", "arm64"]
+    cmd = []
+    if is_arm64 and shutil.which("box64"):
+        cmd += ["box64"]
+    wine_bin = "wine64" if shutil.which("wine64") else "wine"
+    exe_path = os.getenv("SKP2GLTF_EXE", "/app/skp2gltf.exe")
+    cmd += [wine_bin, exe_path, input_path, "--metadata", "dummy", "dummy"] # padding args for current main.cpp logic
+
+    env = os.environ.copy()
+    if "DISPLAY" not in env:
+        env["DISPLAY"] = ":99"
+
+    process = await asyncio.create_subprocess_exec(
+        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=env
+    )
+    stdout, stderr = await process.communicate()
+    output = stdout.decode()
+    
+    # Extract JSON part (after "Start conversion\n")
+    if "Start conversion" in output:
+        json_str = output.split("Start conversion")[-1].strip()
+        try:
+            import json
+            return True, json.loads(json_str)
+        except:
+            return False, f"Invalid JSON output: {json_str}"
+    
+    return False, f"Failed to extract metadata: {output} {stderr.decode()}"
+
+
 @app.get("/health")
 async def health():
     xvfb_active = os.path.exists("/tmp/.X99-lock")
@@ -114,6 +146,28 @@ async def health():
         "architecture": os.uname().machine,
         "xvfb_active": xvfb_active,
     }
+
+
+@app.post("/metadata")
+async def get_metadata(file: UploadFile = File(...)):
+    if not file.filename.lower().endswith(".skp"):
+        raise HTTPException(status_code=400, detail="Only .skp files supported")
+    
+    tmp_dir = tempfile.mkdtemp(prefix="api_meta_")
+    input_path = os.path.join(tmp_dir, file.filename)
+    
+    try:
+        with open(input_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        async with lock:
+            ok, data = await run_metadata(input_path)
+            if not ok:
+                raise HTTPException(status_code=500, detail=f"Metadata extraction failed: {data}")
+        
+        return data
+    finally:
+        cleanup_tmp(tmp_dir)
 
 
 @app.post("/convert")

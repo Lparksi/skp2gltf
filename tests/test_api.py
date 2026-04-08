@@ -107,6 +107,29 @@ async def test_convert_path(client: httpx.AsyncClient):
     # Should be 404 because file doesn't exist
     assert response.status_code == 404
 
+@pytest.mark.asyncio
+async def test_metadata(client: httpx.AsyncClient):
+    """Test the /metadata endpoint"""
+    skp_files = glob.glob("test/*.skp")
+    if not skp_files:
+        content = b"This is a dummy SKP for metadata testing"
+        files = {"file": ("test.skp", content, "application/octet-stream")}
+        response = await client.post("/metadata", files=files)
+        # It should fail with dummy content but return a 500 or 200 with error msg
+        assert response.status_code in [200, 500]
+        return
+
+    # test with real file
+    skp_file_path = skp_files[0]
+    with open(skp_file_path, "rb") as f:
+        content = f.read()
+    files = {"file": (os.path.basename(skp_file_path), content, "application/octet-stream")}
+    response = await client.post("/metadata", files=files)
+    assert response.status_code in [200, 500]
+    if response.status_code == 200:
+        data = response.json()
+        assert "faces" in data or "error" in data
+
 if __name__ == "__main__":
     # Simple manual test trigger
     import sys

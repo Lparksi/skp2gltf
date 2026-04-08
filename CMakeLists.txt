@@ -17,7 +17,7 @@ if(MSVC)
     set(CMAKE_CXX_FLAGS_RELEASE "/MD /O2 /Ob2 /DNDEBUG")
 endif()
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 set(BUILD_USE_64BITS on)
 # set(BUILD_BIN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/build/windows/)
@@ -43,35 +43,23 @@ set(DRACO_MESH_COMPRESSION ON CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(draco)
 
-# Explicitly add the necessary include directories to the `draco` target
-# so they are properly propagated to any target that links against it.
-target_include_directories(draco INTERFACE 
-    ${draco_SOURCE_DIR}/src
-    ${CMAKE_BINARY_DIR}
-)
-
-include_directories(
-    ${PROJECT_SOURCE_DIR}/include
-    ${PROJECT_SOURCE_DIR}/include/exportgltf
-    ${PROJECT_SOURCE_DIR}/include/gltflib
-    ${PROJECT_SOURCE_DIR}/include/skp
-
-    ${PROJECT_SOURCE_DIR}/thirdparty
-    ${PROJECT_SOURCE_DIR}/thirdparty/pugixml
-    ${PROJECT_SOURCE_DIR}/thirdparty/nlohmann
-    ${PROJECT_SOURCE_DIR}/thirdparty/rapidjson
-    ${PROJECT_SOURCE_DIR}/thirdparty/tinygltf
-    ${PROJECT_SOURCE_DIR}/thirdparty/SketchUpAPI
-    ${draco_SOURCE_DIR}/src
-    ${CMAKE_BINARY_DIR}
-)
-
 # 添加子目录
 add_subdirectory(src/gltflib)
 add_subdirectory(src/skp)
 
 # 添加可执行文件
 add_executable(skp2gltf src/main.cpp)
+
+target_include_directories(skp2gltf PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/include/skp
+    ${PROJECT_SOURCE_DIR}/thirdparty
+    ${PROJECT_SOURCE_DIR}/thirdparty/tinygltf
+    ${PROJECT_SOURCE_DIR}/thirdparty/nlohmann
+    ${PROJECT_SOURCE_DIR}/thirdparty/SketchUpAPI
+    ${draco_SOURCE_DIR}/src
+    ${CMAKE_BINARY_DIR}
+)
 
 # 根据编译器类型设置链接器选项
 if(MSVC)

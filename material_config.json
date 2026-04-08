@@ -1,0 +1,28 @@
+{
+    "mappings": [
+        {
+            "keywords": ["metal", "steel", "iron", "aluminum", "chrome"],
+            "metallic": 1.0,
+            "roughness": 0.2
+        },
+        {
+            "keywords": ["glass", "water", "mirror", "polished"],
+            "metallic": 0.0,
+            "roughness": 0.05
+        },
+        {
+            "keywords": ["wood", "stone", "brick", "concrete", "fabric", "cloth"],
+            "metallic": 0.0,
+            "roughness": 0.8
+        },
+        {
+            "keywords": ["plastic", "paint"],
+            "metallic": 0.0,
+            "roughness": 0.4
+        }
+    ],
+    "defaults": {
+        "metallic": 0.0,
+        "roughness": 0.6
+    }
+}

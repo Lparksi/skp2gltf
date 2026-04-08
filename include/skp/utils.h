@@ -12,10 +12,21 @@ bool IsCancelled(SketchUpPluginProgressCallback* callback) {
   return callback != NULL && callback->HasBeenCancelled();
 }
 
+#include <iostream>
+#include <stdexcept>
+#include <string>
+
 // Calls an SU* API function, checks for successful return value. If not
 // successful, throws an exception to be caught by the top level handler.
 // Should only be used if function is expected to return SU_ERROR_NONE.
-#define SU_CALL(func) if ((func) != SU_ERROR_NONE) throw std::exception()
+#define SU_CALL(func) \
+    do { \
+        auto res = (func); \
+        if (res != SU_ERROR_NONE) { \
+            std::cerr << "SketchUp API Error: " << #func << " failed with code " << res << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+            throw std::runtime_error("SketchUp API Error in " #func); \
+        } \
+    } while (0)
 
 // Set progress percent and message, if progress callback is available.
 void HandleProgress(SketchUpPluginProgressCallback* callback,
