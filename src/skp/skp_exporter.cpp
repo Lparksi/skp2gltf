@@ -30,6 +30,8 @@
 #include "utils.h"
 #include "gltflib/gltfdraco.h"
 #include "texture_processor.h"
+#include <meshoptimizer.h>
+
 
 
 #include <SketchUpAPI/import_export/pluginprogresscallback.h>
@@ -644,7 +646,7 @@ int CSkpExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
             std::unordered_map<Pos, std::vector<float>, PosHash> posToNormals;
 
             for (const auto& facet : facetVec) {
-                // 计算面法线
+                // 计算面法线 (其长度为三角形面积的两倍，用于面积加权平滑法线)
                 float v[3][3] = {
                     {(float)facet.vertex[0].x, (float)facet.vertex[0].y, (float)facet.vertex[0].z},
                     {(float)facet.vertex[1].x, (float)facet.vertex[1].y, (float)facet.vertex[1].z},
@@ -655,10 +657,8 @@ int CSkpExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
                 float nx = edge1[1] * edge2[2] - edge1[2] * edge2[1];
                 float ny = edge1[2] * edge2[0] - edge1[0] * edge2[2];
                 float nz = edge1[0] * edge2[1] - edge1[1] * edge2[0];
-                float len = std::sqrt(nx * nx + ny * ny + nz * nz);
-                if (len > 1e-8f) { nx /= len; ny /= len; nz /= len; }
-                else { nx = 0; ny = 0; nz = 1.0f; }
-
+                
+                // 不进行归一化，直接累加，实现面积加权
                 for (int j = 0; j < 3; j++) {
                     Pos p = {v[j][0], v[j][1], v[j][2]};
                     auto& nSum = posToNormals[p];
@@ -703,7 +703,7 @@ int CSkpExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
                     if (it != vertexCache.end()) {
                         indices.push_back(it->second);
                     } else {
-                        unsigned int newIndex = vertexOffset++;
+                        unsigned int newIndex = (unsigned int)vertexOffset++;
                         vertexCache[vData] = newIndex;
                         indices.push_back(newIndex);
                         
@@ -715,6 +715,35 @@ int CSkpExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
                         uvs.push_back(u); uvs.push_back(v_coord);
                     }
                 }
+            }
+
+            // 3. 第三阶段：使用 meshoptimizer 进行顶点顺序和缓存优化
+            if (!indices.empty() && vertexOffset > 0) {
+                // 优化顶点缓存（提高读性能）
+                meshopt_optimizeVertexCache(indices.data(), indices.data(), indices.size(), vertexOffset);
+                
+                // 优化顶点获取（提高内存局部性）
+                // 必须按顺序对所有流进行重映射
+                std::vector<unsigned int> remap(vertexOffset);
+                size_t unique_vertices = meshopt_optimizeVertexFetchRemap(remap.data(), indices.data(), indices.size(), vertexOffset);
+                
+                meshopt_remapIndexBuffer(indices.data(), indices.data(), indices.size(), remap.data());
+                
+                std::vector<float> optimized_positions(unique_vertices * 3);
+                meshopt_remapVertexBuffer(optimized_positions.data(), positions.data(), vertexOffset, sizeof(float) * 3, remap.data());
+                positions = std::move(optimized_positions);
+                
+                std::vector<float> optimized_normals(unique_vertices * 3);
+                meshopt_remapVertexBuffer(optimized_normals.data(), normals.data(), vertexOffset, sizeof(float) * 3, remap.data());
+                normals = std::move(optimized_normals);
+                
+                if (!uvs.empty()) {
+                    std::vector<float> optimized_uvs(unique_vertices * 2);
+                    meshopt_remapVertexBuffer(optimized_uvs.data(), uvs.data(), vertexOffset, sizeof(float) * 2, remap.data());
+                    uvs = std::move(optimized_uvs);
+                }
+                
+                vertexOffset = unique_vertices;
             }
 
             // POSITION
@@ -794,11 +823,22 @@ int CSkpExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
             material.pbrMetallicRoughness.roughnessFactor = roughness;
             
             // Alpha 混合模式处理
+            std::string matNameLower = ToLowerCopy(item.first.name);
             if (item.first.a < 0.99) {
-                material.alphaMode = "BLEND";
+                // 如果材质名包含 leaf, fence, tree 等，且有透明度，通常 MASK 模式效果更稳
+                if (matNameLower.find("leaf") != std::string::npos || 
+                    matNameLower.find("tree") != std::string::npos ||
+                    matNameLower.find("fence") != std::string::npos ||
+                    matNameLower.find("alpha") != std::string::npos) {
+                    material.alphaMode = "MASK";
+                    material.alphaCutoff = 0.5;
+                } else {
+                    material.alphaMode = "BLEND";
+                }
                 material.doubleSided = true;
             } else {
                 material.alphaMode = "OPAQUE";
+                material.doubleSided = false;
             }
 
             if (!item.first.imageUri.empty()) {

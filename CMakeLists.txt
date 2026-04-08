@@ -43,6 +43,15 @@ set(DRACO_MESH_COMPRESSION ON CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(draco)
 
+# 自动从官方 GitHub 下载并集成 meshoptimizer
+FetchContent_Declare(
+    meshoptimizer
+    GIT_REPOSITORY https://github.com/zeux/meshoptimizer.git
+    GIT_TAG        v0.21
+)
+FetchContent_MakeAvailable(meshoptimizer)
+
+
 # 显式将 draco 的头文件路径添加到其接口中，以便链接它的目标能正确获取包含路径
 target_include_directories(draco INTERFACE 
     ${draco_SOURCE_DIR}/src
@@ -84,6 +93,7 @@ target_link_libraries(skp2gltf PRIVATE
     gltflib
     skp2native
     draco # 使用 FetchContent 生成的 target
+    meshoptimizer
     ${CMAKE_SOURCE_DIR}/lib/SketchUpAPI.lib
     ${CMAKE_SOURCE_DIR}/lib/sketchup.lib
 )
