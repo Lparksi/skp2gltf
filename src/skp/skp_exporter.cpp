@@ -646,7 +646,7 @@ int CSkpExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
             std::unordered_map<Pos, std::vector<float>, PosHash> posToNormals;
 
             for (const auto& facet : facetVec) {
-                // 计算面法线
+                // 计算面法线 (其长度为三角形面积的两倍，用于面积加权平滑法线)
                 float v[3][3] = {
                     {(float)facet.vertex[0].x, (float)facet.vertex[0].y, (float)facet.vertex[0].z},
                     {(float)facet.vertex[1].x, (float)facet.vertex[1].y, (float)facet.vertex[1].z},
@@ -657,10 +657,8 @@ int CSkpExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
                 float nx = edge1[1] * edge2[2] - edge1[2] * edge2[1];
                 float ny = edge1[2] * edge2[0] - edge1[0] * edge2[2];
                 float nz = edge1[0] * edge2[1] - edge1[1] * edge2[0];
-                float len = std::sqrt(nx * nx + ny * ny + nz * nz);
-                if (len > 1e-8f) { nx /= len; ny /= len; nz /= len; }
-                else { nx = 0; ny = 0; nz = 1.0f; }
-
+                
+                // 不进行归一化，直接累加，实现面积加权
                 for (int j = 0; j < 3; j++) {
                     Pos p = {v[j][0], v[j][1], v[j][2]};
                     auto& nSum = posToNormals[p];

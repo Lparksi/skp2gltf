@@ -38,7 +38,15 @@ asyncio_default_fixture_loop_scope = "function"
 ### 4. 禁止自动 Git 提交
 **规则要求**：除非用户在对话中明确发出提交（commit）请求，否则 AI 助手禁止执行 `git commit` 或 `git push` 命令。即使修复了代码，也应由用户手动执行或在明确指令下代为执行。
 
+### 5. 几何优化与模型质量 (Geometry Optimization)
+**核心特性**：
+- **Meshoptimizer 整合**：自动进行顶点缓存优化 (`Vertex Cache Optimization`) 和顶点获取优化 (`Vertex Fetch Optimization`)，极大地提升了渲染实时性能。
+- **面积加权平滑法线 (Weighted Normals)**：采用三角形面积加权的法线计算方式，消除了模型表面的光影锯齿，使光照更加自然。
+- **智能 Alpha 模式检测**：根据材质名称关键词（如 leaf, fence）自动切换 `MASK` 或 `BLEND` 模式，解决了 Web 端透明物体排序错乱的顽疾。
+- **Draco & KTX2 协同**：在几何优化的基础上，配合 Draco 压缩和 KTX2 纹理压缩，实现了极小体积下的极高质量输出。
+
 ## 🛠 开发指南 (Development Guide)
+
 
 ### 环境说明
 - **包管理**：项目使用 `uv` 替代传统的 `pip`。在 Dockerfile 中通过多阶段构建或单独 `COPY` 方式引入 `uv` 镜像。
