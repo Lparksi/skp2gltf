@@ -93,7 +93,7 @@ target_link_libraries(skp2gltf PRIVATE
     gltflib
     skp2native
     draco # 使用 FetchContent 生成的 target
-    meshoptimizer::meshoptimizer
+    meshoptimizer
     ${CMAKE_SOURCE_DIR}/lib/SketchUpAPI.lib
     ${CMAKE_SOURCE_DIR}/lib/sketchup.lib
 )
