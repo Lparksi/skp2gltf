@@ -1,13 +1,6 @@
-/*
- * @Author: yaol 
- * @Date: 2025-02-18 17:28:11 
- * @Last Modified by:   yaol 
- * @Last Modified time: 2025-02-18 17:28:11 
- */
-
 #include <assert.h>
 
-#include "./xmlinheritancemanager.h"
+#include "./skp_inheritance_manager.h"
 #include <SketchUpAPI/model/component_definition.h>
 #include <SketchUpAPI/model/component_instance.h>
 #include <SketchUpAPI/model/drawing_element.h>
@@ -18,20 +11,20 @@
 #include <SketchUpAPI/model/layer.h>
 #include <SketchUpAPI/model/material.h>
 
-using namespace XmlGeomUtils;
+using namespace SkpGeomUtils;
 
-CInheritanceManager::CInheritanceManager() {
+CSkpInheritanceManager::CSkpInheritanceManager() {
   materials_by_layer_ = false;
 }
 
-CInheritanceManager::CInheritanceManager(bool by_layer) {
+CSkpInheritanceManager::CSkpInheritanceManager(bool by_layer) {
   materials_by_layer_ = by_layer;
 }
 
-CInheritanceManager::~CInheritanceManager() {
+CSkpInheritanceManager::~CSkpInheritanceManager() {
 }
 
-void CInheritanceManager::PushMaterial(SUDrawingElementRef drawing_element) {
+void CSkpInheritanceManager::PushMaterial(SUDrawingElementRef drawing_element) {
   SUMaterialRef material;
   SUSetInvalid(material);
   SUDrawingElementGetMaterial(drawing_element, &material);
@@ -43,32 +36,32 @@ void CInheritanceManager::PushMaterial(SUDrawingElementRef drawing_element) {
   edge_colors_.push_back(color);
 }
 
-void CInheritanceManager::PushLayer(SUDrawingElementRef drawingElementRef) {
+void CSkpInheritanceManager::PushLayer(SUDrawingElementRef drawingElementRef) {
   SULayerRef layer;
   SUSetInvalid(layer);
   SUDrawingElementGetLayer(drawingElementRef, &layer);
   layers_.push_back(layer);
 }
 
-void CInheritanceManager::PushElement(SUGroupRef group) {
+void CSkpInheritanceManager::PushElement(SUGroupRef group) {
   // Material & Layer
   SUDrawingElementRef drawing_element = SUGroupToDrawingElement(group);
   PushMaterial(drawing_element);
   PushLayer(drawing_element);
 }
-void CInheritanceManager::PushElement(SUComponentDefinitionRef group) {
+void CSkpInheritanceManager::PushElement(SUComponentDefinitionRef group) {
     // Material & Layer
     SUDrawingElementRef drawing_element = SUComponentDefinitionToDrawingElement(group);
     PushMaterial(drawing_element);
     PushLayer(drawing_element);
 }
-void CInheritanceManager::PushElement(SUComponentInstanceRef group) {
+void CSkpInheritanceManager::PushElement(SUComponentInstanceRef group) {
     // Material & Layer
     SUDrawingElementRef drawing_element = SUComponentInstanceToDrawingElement(group);
     PushMaterial(drawing_element);
     PushLayer(drawing_element);
 }
-void CInheritanceManager::PushElement(SUFaceRef face) {
+void CSkpInheritanceManager::PushElement(SUFaceRef face) {
   // Front Material
   SUMaterialRef front_material = SU_INVALID;
   SUFaceGetFrontMaterial(face, &front_material);
@@ -89,7 +82,7 @@ void CInheritanceManager::PushElement(SUFaceRef face) {
   layers_.push_back(layer);
 }
 
-void CInheritanceManager::PushElement(SUEdgeRef edge) {
+void CSkpInheritanceManager::PushElement(SUEdgeRef edge) {
   // Materials
   SUMaterialRef material = SU_INVALID;
   front_materials_.push_back(material);
@@ -106,7 +99,7 @@ void CInheritanceManager::PushElement(SUEdgeRef edge) {
   layers_.push_back(layer);
 }
 
-void CInheritanceManager::PopElement() {
+void CSkpInheritanceManager::PopElement() {
   // Materials
   assert(front_materials_.size() > 0);
   front_materials_.pop_back();
@@ -123,7 +116,7 @@ void CInheritanceManager::PopElement() {
   layers_.pop_back();
 }
 
-SULayerRef CInheritanceManager::GetCurrentLayer() const {
+SULayerRef CSkpInheritanceManager::GetCurrentLayer() const {
   // Search layer stack for first non-null layer
   int n = static_cast<int>(layers_.size());
   for (int i = n; --i >= 0;) {
@@ -135,7 +128,7 @@ SULayerRef CInheritanceManager::GetCurrentLayer() const {
   return layer;
 }
 
-SUMaterialRef CInheritanceManager::GetCurrentFrontMaterial() const {
+SUMaterialRef CSkpInheritanceManager::GetCurrentFrontMaterial() const {
   SUMaterialRef material = SU_INVALID;
   if (materials_by_layer_) {
     SULayerRef layer = GetCurrentLayer();
@@ -154,7 +147,7 @@ SUMaterialRef CInheritanceManager::GetCurrentFrontMaterial() const {
   return material;
 }
 
-SUMaterialRef CInheritanceManager::GetCurrentBackMaterial() const {
+SUMaterialRef CSkpInheritanceManager::GetCurrentBackMaterial() const {
   SUMaterialRef material = SU_INVALID;
   if (materials_by_layer_) {
     SULayerRef layer = GetCurrentLayer();
@@ -173,7 +166,7 @@ SUMaterialRef CInheritanceManager::GetCurrentBackMaterial() const {
   return material;
 }
 
-SUColor CInheritanceManager::GetCurrentEdgeColor() const {
+SUColor CSkpInheritanceManager::GetCurrentEdgeColor() const {
   SUColor color = { 0 };
   SUMaterialRef material = SU_INVALID;
   if (materials_by_layer_) {

@@ -1,9 +1,7 @@
-// Copyright 2013 Trimble Navigation Limited. All Rights Reserved.
-
-#include "./xmlgeomutils.h"
+#include "./skp_geom_utils.h"
 
 
-namespace XmlGeomUtils {
+namespace SkpGeomUtils {
 
 // Misc Utilities--------------------------------------
 const double EqualTol = 1.0e-3;

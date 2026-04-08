@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "./xmltexturehelper.h"
+#include "./skp_texture_helper.h"
 
 #include <SketchUpAPI/model/component_definition.h>
 #include <SketchUpAPI/model/component_instance.h>
@@ -20,10 +20,16 @@
 #include <SketchUpAPI/model/texture_writer.h>
 #include <SketchUpAPI/model/typed_value.h>
 
-CXmlTextureHelper::CXmlTextureHelper() {
+// Implementation of SkpTextureHelper
+void SkpTextureHelper::WriteTextureFile(SUMaterialRef material, const std::string& path) {
+    if (SUIsInvalid(material)) return;
+    SUTextureRef texture = SU_INVALID;
+    if (SUMaterialGetTexture(material, &texture) == SU_ERROR_NONE) {
+        SUTextureWriteToFile(texture, path.c_str());
+    }
 }
 
-size_t CXmlTextureHelper::LoadAllTextures(SUModelRef model,
+size_t SkpTextureHelper::LoadAllTextures(SUModelRef model,
                                           SUTextureWriterRef texture_writer,
                                           bool textures_from_layers) {
   if (SUIsInvalid(texture_writer)) return 0;
@@ -78,14 +84,14 @@ size_t CXmlTextureHelper::LoadAllTextures(SUModelRef model,
   return count;
 }
 
-void CXmlTextureHelper::LoadComponent(SUTextureWriterRef texture_writer,
+void SkpTextureHelper::LoadComponent(SUTextureWriterRef texture_writer,
                                       SUComponentDefinitionRef component) {
   SUEntitiesRef entities = SU_INVALID;
   SUComponentDefinitionGetEntities(component, &entities);
   LoadEntities(texture_writer, entities);
 }
 
-void CXmlTextureHelper::LoadEntities(SUTextureWriterRef texture_writer,
+void SkpTextureHelper::LoadEntities(SUTextureWriterRef texture_writer,
                                      SUEntitiesRef entities) {
   // Top level faces, instances, groups, and images
   LoadFaces(texture_writer, entities);
@@ -94,7 +100,7 @@ void CXmlTextureHelper::LoadEntities(SUTextureWriterRef texture_writer,
   LoadImages(texture_writer, entities);
 }
 
-void CXmlTextureHelper::LoadFaces(SUTextureWriterRef texture_writer,
+void SkpTextureHelper::LoadFaces(SUTextureWriterRef texture_writer,
                                   SUEntitiesRef entities) {
   SUResult hr;
   if (!SUIsInvalid(entities)) {
@@ -116,7 +122,7 @@ void CXmlTextureHelper::LoadFaces(SUTextureWriterRef texture_writer,
 }
 
 
-void CXmlTextureHelper::LoadComponentInstances(
+void SkpTextureHelper::LoadComponentInstances(
     SUTextureWriterRef texture_writer, SUEntitiesRef entities) {
   SUResult hr;
   if (!SUIsInvalid(entities)) {
@@ -140,7 +146,7 @@ void CXmlTextureHelper::LoadComponentInstances(
   }
 }
 
-void CXmlTextureHelper::LoadGroups(SUTextureWriterRef texture_writer,
+void SkpTextureHelper::LoadGroups(SUTextureWriterRef texture_writer,
                                    SUEntitiesRef entities) {
   if (!SUIsInvalid(entities)) {
     size_t num_groups;
@@ -162,7 +168,7 @@ void CXmlTextureHelper::LoadGroups(SUTextureWriterRef texture_writer,
   }
 }
 
-void CXmlTextureHelper::LoadImages(SUTextureWriterRef texture_writer,
+void SkpTextureHelper::LoadImages(SUTextureWriterRef texture_writer,
                                    SUEntitiesRef entities) {
   if (!SUIsInvalid(entities)) {
     size_t num_images = 0;

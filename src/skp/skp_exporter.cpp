@@ -22,9 +22,9 @@
 #include <unordered_map>
 #include <functional>
 
-#include "xmlexporter.h"
-#include "xmltexturehelper.h"
-#include "xmlgeomutils.h"
+#include "skp_exporter.h"
+#include "skp_texture_helper.h"
+#include "skp_geom_utils.h"
 #include "utils.h"
 #include "gltflib/gltfdraco.h"
 #include "texture_processor.h"
@@ -50,7 +50,7 @@
 #include <SketchUpAPI/model/uv_helper.h>
 #include <SketchUpAPI/model/vertex.h>
 
-using namespace XmlGeomUtils;
+using namespace SkpGeomUtils;
 #define pos(a, b) ((a) + ((b)*4))
 // A simple SUStringRef wrapper class which makes usage simpler from C++.
 class CSUString
@@ -153,16 +153,16 @@ static std::string BuildOutputPathByFormat(const std::string &base_path, const s
 }
 
 
-CXmlExporter::CXmlExporter()
+CSkpExporter::CSkpExporter()
 {
     SUSetInvalid(model_);
     SUSetInvalid(texture_writer_);
     activeFacetMap_ = &facetMap;
 }
 
-CXmlExporter::~CXmlExporter() {}
+CSkpExporter::~CSkpExporter() {}
 
-void CXmlExporter::ReleaseModelObjects()
+void CSkpExporter::ReleaseModelObjects()
 {
     if (!SUIsInvalid(texture_writer_))
     {
@@ -180,12 +180,12 @@ void CXmlExporter::ReleaseModelObjects()
     SUTerminate();
 }
 
-bool CXmlExporter::Convert(const std::string &src_file,
-                           const std::string &file_path,
-                           const std::string &file_name,
-                           const std::string &output_format,
-                           bool use_draco,
-                           SketchUpPluginProgressCallback *progress_callback)
+bool CSkpExporter::Convert(const std::string &src_file,
+                            const std::string &file_path,
+                            const std::string &file_name,
+                            const std::string &output_format,
+                            bool use_draco,
+                            SketchUpPluginProgressCallback *progress_callback)
 {
     bool exported = false;
     outPath       = file_path;
@@ -201,19 +201,13 @@ bool CXmlExporter::Convert(const std::string &src_file,
         // Create a texture writer
         SUSetInvalid(texture_writer_);
         SU_CALL(SUTextureWriterCreate(&texture_writer_));
-        // Open the xml file for creation
-        if (!file_.Open("123.xml", true))
-        {
-            ReleaseModelObjects();
-            return exported;
-        }
+        
         // Materials
         std::cout << "WriteMaterials" << std::endl;
         WriteMaterials();
         // Geometry
         std::cout << "WriteGeometry" << std::endl;
         WriteGeometry();
-        file_.Close(IsCancelled(progress_callback));
         
         // 在导出到GLTF之前压缩纹理
         CompressAndResizeTextures();
@@ -223,7 +217,6 @@ bool CXmlExporter::Convert(const std::string &src_file,
     catch (...)
     {
         exported = false;
-        file_.Close(true);
     }
     ReleaseModelObjects();
     return exported;
@@ -242,11 +235,11 @@ static void WriteMaterialsTextureImage(SUMaterialRef material, const std::string
     SU_CALL(SUTextureWriteToFile(texture, texture_image_file.c_str()));
 }
 
-static XmlMaterialInfo GetMaterialInfo(SUMaterialRef material, const std::string &texture_directory)
+static SkpMaterialInfo GetMaterialInfo(SUMaterialRef material, const std::string &texture_directory)
 {
     assert(SUIsValid(material));
 
-    XmlMaterialInfo info;
+    SkpMaterialInfo info;
 
     // Name
     info.name_ = GetMaterialName(material);
@@ -310,7 +303,7 @@ static XmlMaterialInfo GetMaterialInfo(SUMaterialRef material, const std::string
     return info;
 }
 
-void CXmlExporter::WriteMaterials()
+void CSkpExporter::WriteMaterials()
 {
     if (options_.export_materials())
     {
@@ -350,27 +343,24 @@ void CXmlExporter::WriteMaterials()
     }
 }
 
-void CXmlExporter::WriteMaterial(SUMaterialRef material)
+void CSkpExporter::WriteMaterial(SUMaterialRef material)
 {
     if (SUIsInvalid(material))
         return;
 
-    XmlMaterialInfo info    = GetMaterialInfo(material, outPath);
+    SkpMaterialInfo info    = GetMaterialInfo(material, outPath);
     materialMap[info.name_] = info;
     if (!info.texture_path_.empty())
     {
         std::cout << info.texture_path_ << std::endl;
     }
     WriteMaterialsTextureImage(material, info.texture_path_);
-    file_.WriteMaterialInfo(info);
 }
 
-void CXmlExporter::WriteGeometry()
+void CSkpExporter::WriteGeometry()
 {
     if (options_.export_faces() || options_.export_edges())
     {
-        file_.StartGeometry();
-        
         SUTransformation identity = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
         
         // 1. Process the root entities
@@ -390,12 +380,10 @@ void CXmlExporter::WriteGeometry()
         // 确保处理完所有剩余数据
         faceBuffer.clear();
         faceBuffer.shrink_to_fit();
-        
-        file_.PopParentNode();
     }
 }
 
-void CXmlExporter::ProcessGeometryBatch(SUEntitiesRef entities, 
+void CSkpExporter::ProcessGeometryBatch(SUEntitiesRef entities, 
                                       const SUTransformation& transformation,
                                       size_t batchSize,
                                       int parentNodeIdx) {
@@ -430,7 +418,7 @@ void CXmlExporter::ProcessGeometryBatch(SUEntitiesRef entities,
     }
 }
 
-void CXmlExporter::WriteEntities(SUEntitiesRef entities, const SUTransformation &transformation, int parentNodeIdx)
+void CSkpExporter::WriteEntities(SUEntitiesRef entities, const SUTransformation &transformation, int parentNodeIdx)
 {
     if (SUIsInvalid(entities)) {
         return;
@@ -439,7 +427,7 @@ void CXmlExporter::WriteEntities(SUEntitiesRef entities, const SUTransformation 
     // 使用 ProcessGeometryBatch 统一处理所有实体
     ProcessGeometryBatch(entities, transformation, DEFAULT_BATCH_SIZE, parentNodeIdx);
 }
-void CXmlExporter::traversalGroupEntity(SUEntitiesRef entities, const SUTransformation &transformation, int parentNodeIdx)
+void CSkpExporter::traversalGroupEntity(SUEntitiesRef entities, const SUTransformation &transformation, int parentNodeIdx)
 {
     // Groups in SketchUp are essentially ComponentInstances under the hood.
     // For simplicity, we can treat them similarly to instances or keep them as direct nodes.
@@ -484,7 +472,7 @@ void CXmlExporter::traversalGroupEntity(SUEntitiesRef entities, const SUTransfor
         }
     }
 }
-void CXmlExporter::getComponentEntity(SUEntitiesRef entities, const SUTransformation &transformation, int parentNodeIdx)
+void CSkpExporter::getComponentEntity(SUEntitiesRef entities, const SUTransformation &transformation, int parentNodeIdx)
 {
     size_t componentInstanceLen;
     SUEntitiesGetNumInstances(entities, &componentInstanceLen);
@@ -564,30 +552,35 @@ void CXmlExporter::getComponentEntity(SUEntitiesRef entities, const SUTransforma
     }
 }
 
-int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::string &outputFormat, bool use_draco) {
+int CSkpExporter::exportToGltfImpl(const std::string &gltfName, const std::string &outputFormat, bool use_draco) {
+    const float weldEpsilon = static_cast<float>(options_.vertex_weld_epsilon());
+    const float invEpsilon = 1.0f / weldEpsilon;
+    
     struct VertexData {
         float x, y, z;
         float nx, ny, nz;
         float u, v;
+        int gridX, gridY, gridZ;
 
         bool operator==(const VertexData& o) const {
-            return x == o.x && y == o.y && z == o.z &&
-                   nx == o.nx && ny == o.ny && nz == o.nz &&
-                   u == o.u && v == o.v;
+            return gridX == o.gridX && gridY == o.gridY && gridZ == o.gridZ &&
+                   std::abs(nx - o.nx) < 0.01f &&
+                   std::abs(ny - o.ny) < 0.01f &&
+                   std::abs(nz - o.nz) < 0.01f &&
+                   std::abs(u - o.u) < 0.001f &&
+                   std::abs(v - o.v) < 0.001f;
         }
     };
 
     struct VertexDataHash {
         size_t operator()(const VertexData& v) const {
-            size_t h1 = std::hash<float>()(v.x);
-            size_t h2 = std::hash<float>()(v.y);
-            size_t h3 = std::hash<float>()(v.z);
+            size_t h1 = std::hash<int>()(v.gridX);
+            size_t h2 = std::hash<int>()(v.gridY);
+            size_t h3 = std::hash<int>()(v.gridZ);
             size_t h4 = std::hash<float>()(v.nx);
             size_t h5 = std::hash<float>()(v.ny);
             size_t h6 = std::hash<float>()(v.nz);
-            size_t h7 = std::hash<float>()(v.u);
-            size_t h8 = std::hash<float>()(v.v);
-            return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4) ^ (h6 << 5) ^ (h7 << 6) ^ (h8 << 7);
+            return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4) ^ (h6 << 5);
         }
     };
 
@@ -612,31 +605,33 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
             tinygltf::Primitive primitive;
             primitive.mode = 4;  // triangles
             
+            const std::vector<cFacet> &facetVec = item.second;
+            if (facetVec.empty()) continue;
+
             // 收集顶点、法线和索引数据
             std::vector<float> positions;
             std::vector<float> normals;
             std::vector<float> uvs;
             std::vector<unsigned int> indices;
 
-            // 顶点复用缓存
-            std::unordered_map<VertexData, unsigned int, VertexDataHash> vertexCache;
+            // 1. 第一阶段：计算每个位置的累加法线
+            // Key: x,y,z position, Value: Summed normal vector
+            struct Pos { float x, y, z; 
+                bool operator<(const Pos& o) const { 
+                    if (x != o.x) return x < o.x; 
+                    if (y != o.y) return y < o.y; 
+                    return z < o.z; 
+                } 
+            };
+            std::map<Pos, std::vector<float>> posToNormals;
 
-            // 添加用于计算边界的变量
-            float posMin[3] = {FLT_MAX, FLT_MAX, FLT_MAX};
-            float posMax[3] = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
-            
-            const std::vector<cFacet> &facetVec = item.second;
-            size_t vertexOffset = 0;
-            
-            for (size_t i = 0; i < facetVec.size(); i++) {
-                // 先提取三角形的三个顶点坐标
-                float v[3][3] = {
-                    {(float)facetVec[i].vertex[0].x, (float)facetVec[i].vertex[0].y, (float)facetVec[i].vertex[0].z},
-                    {(float)facetVec[i].vertex[1].x, (float)facetVec[i].vertex[1].y, (float)facetVec[i].vertex[1].z},
-                    {(float)facetVec[i].vertex[2].x, (float)facetVec[i].vertex[2].y, (float)facetVec[i].vertex[2].z}
-                };
-                
+            for (const auto& facet : facetVec) {
                 // 计算面法线
+                float v[3][3] = {
+                    {(float)facet.vertex[0].x, (float)facet.vertex[0].y, (float)facet.vertex[0].z},
+                    {(float)facet.vertex[1].x, (float)facet.vertex[1].y, (float)facet.vertex[1].z},
+                    {(float)facet.vertex[2].x, (float)facet.vertex[2].y, (float)facet.vertex[2].z}
+                };
                 float edge1[3] = {v[1][0] - v[0][0], v[1][1] - v[0][1], v[1][2] - v[0][2]};
                 float edge2[3] = {v[2][0] - v[0][0], v[2][1] - v[0][1], v[2][2] - v[0][2]};
                 float nx = edge1[1] * edge2[2] - edge1[2] * edge2[1];
@@ -645,12 +640,47 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
                 float len = std::sqrt(nx * nx + ny * ny + nz * nz);
                 if (len > 1e-8f) { nx /= len; ny /= len; nz /= len; }
                 else { nx = 0; ny = 0; nz = 1.0f; }
-                
+
                 for (int j = 0; j < 3; j++) {
-                    float x = v[j][0], y = v[j][1], z = v[j][2];
-                    float u = (float)facetVec[i].uv[j].x, v_coord = (float)(-facetVec[i].uv[j].y);
+                    Pos p = {v[j][0], v[j][1], v[j][2]};
+                    auto& nSum = posToNormals[p];
+                    if (nSum.empty()) nSum = {0, 0, 0};
+                    nSum[0] += nx; nSum[1] += ny; nSum[2] += nz;
+                }
+            }
+
+            // 归一化累加法线
+            std::map<Pos, std::vector<float>> normalizedNormals;
+            for (auto& entry : posToNormals) {
+                float nx = entry.second[0], ny = entry.second[1], nz = entry.second[2];
+                float len = std::sqrt(nx * nx + ny * ny + nz * nz);
+                if (len > 1e-8f) { nx /= len; ny /= len; nz /= len; }
+                normalizedNormals[entry.first] = {nx, ny, nz};
+            }
+
+            // 2. 第二阶段：构建顶点数据并进行焊接
+            std::unordered_map<VertexData, unsigned int, VertexDataHash> vertexCache;
+            float posMin[3] = {FLT_MAX, FLT_MAX, FLT_MAX};
+            float posMax[3] = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+            size_t vertexOffset = 0;
+
+            for (const auto& facet : facetVec) {
+                for (int j = 0; j < 3; j++) {
+                    float x = (float)facet.vertex[j].x;
+                    float y = (float)facet.vertex[j].y;
+                    float z = (float)facet.vertex[j].z;
+                    float u = (float)facet.uv[j].x;
+                    float v_coord = (float)(-facet.uv[j].y);
                     
-                    VertexData vData = {x, y, z, nx, ny, nz, u, v_coord};
+                    Pos p = {x, y, z};
+                    const auto& sn = normalizedNormals[p];
+                    float nx = sn[0], ny = sn[1], nz = sn[2];
+
+                    int gridX = static_cast<int>(std::floor(x * invEpsilon));
+                    int gridY = static_cast<int>(std::floor(y * invEpsilon));
+                    int gridZ = static_cast<int>(std::floor(z * invEpsilon));
+
+                    VertexData vData = {x, y, z, nx, ny, nz, u, v_coord, gridX, gridY, gridZ};
                     auto it = vertexCache.find(vData);
                     if (it != vertexCache.end()) {
                         indices.push_back(it->second);
@@ -700,29 +730,68 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
                 acc.count = uvs.size() / 2; acc.type = TINYGLTF_TYPE_VEC2;
                 primitive.attributes["TEXCOORD_0"] = model.accessors.size(); model.accessors.push_back(acc);
             }
-            // INDICES (Optimization: use USHORT if possible)
+            // INDICES (Optimization: use smallest possible type)
             {
                 tinygltf::BufferView bv; bv.buffer = 0; bv.byteOffset = model.buffers[0].data.size();
-                if (vertexOffset < 65535) {
+                bv.target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
+                
+                if (vertexOffset < 256) {
+                    std::vector<unsigned char> byteIndices(indices.begin(), indices.end());
+                    bv.byteLength = byteIndices.size() * sizeof(unsigned char);
+                    model.buffers[0].data.insert(model.buffers[0].data.end(), (uint8_t*)byteIndices.data(), (uint8_t*)byteIndices.data() + bv.byteLength);
+                    tinygltf::Accessor acc; acc.bufferView = model.bufferViews.size();
+                    acc.componentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
+                    acc.count = indices.size(); acc.type = TINYGLTF_TYPE_SCALAR;
+                    primitive.indices = model.accessors.size(); model.accessors.push_back(acc);
+                } else if (vertexOffset < 65535) {
                     std::vector<unsigned short> shortIndices(indices.begin(), indices.end());
                     bv.byteLength = shortIndices.size() * sizeof(unsigned short);
                     model.buffers[0].data.insert(model.buffers[0].data.end(), (uint8_t*)shortIndices.data(), (uint8_t*)shortIndices.data() + bv.byteLength);
+                    tinygltf::Accessor acc; acc.bufferView = model.bufferViews.size();
+                    acc.componentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;
+                    acc.count = indices.size(); acc.type = TINYGLTF_TYPE_SCALAR;
+                    primitive.indices = model.accessors.size(); model.accessors.push_back(acc);
                 } else {
                     bv.byteLength = indices.size() * sizeof(unsigned int);
                     model.buffers[0].data.insert(model.buffers[0].data.end(), (uint8_t*)indices.data(), (uint8_t*)indices.data() + bv.byteLength);
+                    tinygltf::Accessor acc; acc.bufferView = model.bufferViews.size();
+                    acc.componentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT;
+                    acc.count = indices.size(); acc.type = TINYGLTF_TYPE_SCALAR;
+                    primitive.indices = model.accessors.size(); model.accessors.push_back(acc);
                 }
-                bv.target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
-                int bvIdx = model.bufferViews.size(); model.bufferViews.push_back(bv);
-                tinygltf::Accessor acc; acc.bufferView = bvIdx;
-                acc.componentType = (vertexOffset < 65535) ? TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT : TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT;
-                acc.count = indices.size(); acc.type = TINYGLTF_TYPE_SCALAR;
-                primitive.indices = model.accessors.size(); model.accessors.push_back(acc);
+                model.bufferViews.push_back(bv);
             }
             
             // MATERIAL
             tinygltf::Material material;
             material.pbrMetallicRoughness.baseColorFactor = {item.first.r, item.first.g, item.first.b, item.first.a};
-            material.name = item.first.name; material.pbrMetallicRoughness.metallicFactor = 0.0; material.pbrMetallicRoughness.roughnessFactor = 1.0;
+            material.name = item.first.name;
+            
+            // PBR 增强：基本启发式设置
+            float metallic = 0.0f;
+            float roughness = 0.8f;
+            
+            std::string lowerName = ToLowerCopy(item.first.name);
+            if (lowerName.find("metal") != std::string::npos || lowerName.find("steel") != std::string::npos || lowerName.find("iron") != std::string::npos) {
+                metallic = 0.8f;
+                roughness = 0.2f;
+            } else if (lowerName.find("glass") != std::string::npos || lowerName.find("water") != std::string::npos) {
+                roughness = 0.1f;
+            } else if (lowerName.find("wood") != std::string::npos || lowerName.find("stone") != std::string::npos) {
+                roughness = 0.9f;
+            }
+
+            material.pbrMetallicRoughness.metallicFactor = metallic;
+            material.pbrMetallicRoughness.roughnessFactor = roughness;
+            
+            // Alpha 混合模式处理
+            if (item.first.a < 0.99) {
+                material.alphaMode = "BLEND";
+                material.doubleSided = true;
+            } else {
+                material.alphaMode = "OPAQUE";
+            }
+
             if (!item.first.imageUri.empty()) {
                 std::string processedTexturePath = ProcessTexture(item.first.imageUri);
                 tinygltf::Image gltfImg; gltfImg.uri = processedTexturePath;
@@ -783,8 +852,14 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
     if (ret && use_draco) {
         std::cout << "Starting Draco compression..." << std::endl;
         gltf::GltfDraco dracoTool(&model);
-        // speed=10, bits: pos=11, tex=10, normal=8, color=8, generic=8
-        dracoTool.encode(10, 11, 10, 8, 8, 8);
+        dracoTool.encode(
+            options_.draco_speed(),
+            options_.draco_position_bits(),
+            options_.draco_tex_bits(),
+            options_.draco_normal_bits(),
+            options_.draco_color_bits(),
+            options_.draco_generic_bits()
+        );
         
         // Save again with Draco extension
         ret = gltf.WriteGltfSceneToFile(&model, outputPath,
@@ -798,12 +873,12 @@ int CXmlExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
 }
 
 
-void CXmlExporter::WriteFace(SUFaceRef face, const SUTransformation &transformation)
+void CSkpExporter::WriteFace(SUFaceRef face, const SUTransformation &transformation)
 {
     if (SUIsInvalid(face))
         return;
 
-    XmlFaceInfo info;
+    SkpFaceInfo info;
 
     // Get Current layer off of our stack and then get the id from it
     SULayerRef layer = inheritance_manager_.GetCurrentLayer();
@@ -883,8 +958,8 @@ void CXmlExporter::WriteFace(SUFaceRef face, const SUTransformation &transformat
     {
         SU_CALL(SUMeshHelperGetBackSTQCoords(mesh_ref, num_vertices, &back_stq[0], &count));
     }
-    XmlMaterialInfo &materialInfo     = materialMap[info.front_mat_name_];
-    XmlMaterialInfo &materialInfoBack = materialMap[info.back_mat_name_];
+    SkpMaterialInfo &materialInfo     = materialMap[info.front_mat_name_];
+    SkpMaterialInfo &materialInfoBack = materialMap[info.back_mat_name_];
     Color color;
     Color colorBack;
     if (info.front_mat_name_ != "")
@@ -999,7 +1074,7 @@ void CXmlExporter::WriteFace(SUFaceRef face, const SUTransformation &transformat
 }
 
 // 添加新的方法实现
-void CXmlExporter::CompressAndResizeTextures() {
+void CSkpExporter::CompressAndResizeTextures() {
     for (auto& materialPair : materialMap) {
         const auto& materialInfo = materialPair.second;
         if (!materialInfo.texture_path_.empty()) {
@@ -1008,11 +1083,11 @@ void CXmlExporter::CompressAndResizeTextures() {
     }
 }
 
-std::string CXmlExporter::ProcessTexture(const std::string& texturePath) {
-    return TextureProcessor::ProcessTexture(texturePath, 1024);
+std::string CSkpExporter::ProcessTexture(const std::string& texturePath) {
+    return TextureProcessor::ProcessTexture(texturePath, options_.texture_max_resolution());
 }
 
-size_t CXmlExporter::GetOrCreateVertexIndex(const VertexKey& key) {
+size_t CSkpExporter::GetOrCreateVertexIndex(const VertexKey& key) {
     auto it = vertexCache.find(key);
     if (it != vertexCache.end()) {
         return it->second;
@@ -1024,7 +1099,7 @@ size_t CXmlExporter::GetOrCreateVertexIndex(const VertexKey& key) {
     return newIndex;
 }
 
-void CXmlExporter::ClearVertexCache() {
+void CSkpExporter::ClearVertexCache() {
     vertexCache.clear();
     uniqueVertices.clear();
 }

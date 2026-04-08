@@ -1,14 +1,14 @@
 // Copyright 2013 Trimble Navigation Limited. All Rights Reserved.
 
-#ifndef SKPTOXML_COMMON_XMLTEXTUREHELPER_H
-#define SKPTOXML_COMMON_XMLTEXTUREHELPER_H
+#ifndef SKPTOXML_COMMON_SKPTEXTUREHELPER_H
+#define SKPTOXML_COMMON_SKPTEXTUREHELPER_H
 
+#include <string>
 #include <SketchUpAPI/model/defs.h>
 
-class CXmlTextureHelper {
+class SkpTextureHelper {
  public:
-  CXmlTextureHelper();
-  virtual ~CXmlTextureHelper() {}
+  static void WriteTextureFile(SUMaterialRef material, const std::string& path);
 
   // Load all textures, return number of textures
   // Input: model to load textures from
@@ -33,4 +33,4 @@ class CXmlTextureHelper {
                   SUEntitiesRef entities);
 };
 
-#endif // SKPTOXML_COMMON_XMLTEXTUREHELPER_H
+#endif // SKPTOXML_COMMON_SKPTEXTUREHELPER_H

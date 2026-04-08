@@ -9,11 +9,11 @@
 ├── include/                  # 公共头文件
 │   ├── exportgltf/          # GLTF导出相关头文件
 │   ├── gltflib/             # GLTF库头文件
-│   └── skp2xml/             # SKP到XML转换头文件
+│   └── skp/                 # SKP 转换引擎头文件
 ├── src/                     # 源代码
 │   ├── exportgltf/          # GLTF导出实现
 │   ├── gltflib/             # GLTF库实现
-│   ├── skp2xml/             # SKP到XML转换实现
+│   ├── skp/                 # SKP 转换引擎实现
 │   └── main.cpp             # 主程序入口
 ├── thirdparty/             # 第三方依赖
 │   ├── SketchUpAPI/         # SketchUp SDK

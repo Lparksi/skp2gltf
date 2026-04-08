@@ -54,7 +54,7 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/include/exportgltf
     ${PROJECT_SOURCE_DIR}/include/gltflib
-    ${PROJECT_SOURCE_DIR}/include/skp2xml
+    ${PROJECT_SOURCE_DIR}/include/skp
 
     ${PROJECT_SOURCE_DIR}/thirdparty
     ${PROJECT_SOURCE_DIR}/thirdparty/pugixml
@@ -62,17 +62,13 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/thirdparty/rapidjson
     ${PROJECT_SOURCE_DIR}/thirdparty/tinygltf
     ${PROJECT_SOURCE_DIR}/thirdparty/SketchUpAPI
-    ${PROJECT_SOURCE_DIR}/thirdparty/rapidxml
-    ${PROJECT_SOURCE_DIR}/thirdparty/tinyxml2
-    ${PROJECT_SOURCE_DIR}/thirdparty/xml2json
     ${draco_SOURCE_DIR}/src
     ${CMAKE_BINARY_DIR}
 )
 
 # 添加子目录
 add_subdirectory(src/gltflib)
-add_subdirectory(src/skp2xml)
-add_subdirectory(src/tinyxml2)
+add_subdirectory(src/skp)
 
 # 添加可执行文件
 add_executable(skp2gltf src/main.cpp)
@@ -92,8 +88,7 @@ endif()
 
 target_link_libraries(skp2gltf PRIVATE
     gltflib
-    skp2xml
-    tinyxml2
+    skp2native
     draco # 使用 FetchContent 生成的 target
     ${CMAKE_SOURCE_DIR}/lib/SketchUpAPI.lib
     ${CMAKE_SOURCE_DIR}/lib/sketchup.lib

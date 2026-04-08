@@ -1,5 +1,5 @@
-#define STB_IMAGE_IMPLEMENTATION
 #define STBI_NO_FAILURE_STRINGS
+#define STB_IMAGE_IMPLEMENTATION
 #include "tinygltf/stb_image.h"
 
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
