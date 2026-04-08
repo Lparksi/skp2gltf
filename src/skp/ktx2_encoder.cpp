@@ -17,7 +17,7 @@ static std::string execCommand(const std::string& cmd) {
     std::string result;
     FILE* pipe = POPEN(cmd.c_str(), "r");
     if (!pipe) return "";
-    while (fgets(buffer.data(), buffer.size(), pipe)) {
+    while (fgets(buffer.data(), (int)buffer.size(), pipe)) {
         result += buffer.data();
     }
     PCLOSE(pipe);

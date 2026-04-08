@@ -21,6 +21,8 @@
 #include <cmath>    // 用于 std::sqrt（法线计算）
 #include <unordered_map>
 #include <functional>
+#include <nlohmann/json.hpp>
+#include <fstream>
 
 #include "skp_exporter.h"
 #include "skp_texture_helper.h"
@@ -202,6 +204,9 @@ bool CSkpExporter::Convert(const std::string &src_file,
         SUSetInvalid(texture_writer_);
         SU_CALL(SUTextureWriterCreate(&texture_writer_));
         
+        // Load PBR configuration
+        LoadMaterialConfig("material_config.json");
+        
         // Materials
         std::cout << "WriteMaterials" << std::endl;
         WriteMaterials();
@@ -214,8 +219,14 @@ bool CSkpExporter::Convert(const std::string &src_file,
         
         exported = exportToGltfImpl(file_name, output_format, use_draco) == 0;
     }
+    catch (const std::exception& e)
+    {
+        std::cerr << "Conversion error: " << e.what() << std::endl;
+        exported = false;
+    }
     catch (...)
     {
+        std::cerr << "Unknown error occurred during conversion." << std::endl;
         exported = false;
     }
     ReleaseModelObjects();
@@ -616,14 +627,21 @@ int CSkpExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
 
             // 1. 第一阶段：计算每个位置的累加法线
             // Key: x,y,z position, Value: Summed normal vector
-            struct Pos { float x, y, z; 
-                bool operator<(const Pos& o) const { 
-                    if (x != o.x) return x < o.x; 
-                    if (y != o.y) return y < o.y; 
-                    return z < o.z; 
+            struct Pos { 
+                float x, y, z; 
+                bool operator==(const Pos& o) const { 
+                    return x == o.x && y == o.y && z == o.z; 
                 } 
             };
-            std::map<Pos, std::vector<float>> posToNormals;
+            struct PosHash {
+                size_t operator()(const Pos& p) const {
+                    auto h1 = std::hash<float>{}(p.x);
+                    auto h2 = std::hash<float>{}(p.y);
+                    auto h3 = std::hash<float>{}(p.z);
+                    return h1 ^ (h2 << 1) ^ (h3 << 2);
+                }
+            };
+            std::unordered_map<Pos, std::vector<float>, PosHash> posToNormals;
 
             for (const auto& facet : facetVec) {
                 // 计算面法线
@@ -650,7 +668,7 @@ int CSkpExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
             }
 
             // 归一化累加法线
-            std::map<Pos, std::vector<float>> normalizedNormals;
+            std::unordered_map<Pos, std::vector<float>, PosHash> normalizedNormals;
             for (auto& entry : posToNormals) {
                 float nx = entry.second[0], ny = entry.second[1], nz = entry.second[2];
                 float len = std::sqrt(nx * nx + ny * ny + nz * nz);
@@ -767,19 +785,10 @@ int CSkpExporter::exportToGltfImpl(const std::string &gltfName, const std::strin
             material.pbrMetallicRoughness.baseColorFactor = {item.first.r, item.first.g, item.first.b, item.first.a};
             material.name = item.first.name;
             
-            // PBR 增强：基本启发式设置
+            // PBR 增强：使用配置文件或内置启发式设置
             float metallic = 0.0f;
             float roughness = 0.8f;
-            
-            std::string lowerName = ToLowerCopy(item.first.name);
-            if (lowerName.find("metal") != std::string::npos || lowerName.find("steel") != std::string::npos || lowerName.find("iron") != std::string::npos) {
-                metallic = 0.8f;
-                roughness = 0.2f;
-            } else if (lowerName.find("glass") != std::string::npos || lowerName.find("water") != std::string::npos) {
-                roughness = 0.1f;
-            } else if (lowerName.find("wood") != std::string::npos || lowerName.find("stone") != std::string::npos) {
-                roughness = 0.9f;
-            }
+            ApplyPbrMapping(item.first.name, metallic, roughness);
 
             material.pbrMetallicRoughness.metallicFactor = metallic;
             material.pbrMetallicRoughness.roughnessFactor = roughness;
@@ -1102,4 +1111,120 @@ size_t CSkpExporter::GetOrCreateVertexIndex(const VertexKey& key) {
 void CSkpExporter::ClearVertexCache() {
     vertexCache.clear();
     uniqueVertices.clear();
+}
+
+std::string CSkpExporter::GetMetadataJson(const std::string& src_file) {
+    using json = nlohmann::json;
+    json meta;
+    
+    try {
+        SUInitialize();
+        SUSetInvalid(model_);
+        SUModelLoadStatus status;
+        if (SUModelCreateFromFileWithStatus(&model_, src_file.c_str(), &status) != SU_ERROR_NONE) {
+            return "{\"error\": \"Failed to load model\"}";
+        }
+        
+        // Basic Stats
+        size_t num_faces = 0;
+        size_t num_materials = 0;
+        size_t num_layers = 0;
+        size_t num_definitions = 0;
+        
+        SUEntitiesRef entities;
+        SUModelGetEntities(model_, &entities);
+        SUEntitiesGetNumFaces(entities, &num_faces);
+        SUModelGetNumMaterials(model_, &num_materials);
+        SUModelGetNumLayers(model_, &num_layers);
+        SUModelGetNumComponentDefinitions(model_, &num_definitions);
+        
+        meta["faces"] = num_faces;
+        meta["materials_count"] = num_materials;
+        meta["layers_count"] = num_layers;
+        meta["definitions_count"] = num_definitions;
+        
+        // Unit info
+        SUModelUnits units;
+        SUModelGetUnits(model_, &units);
+        meta["units"] = static_cast<int>(units);
+        
+        // Materials list
+        if (num_materials > 0) {
+            std::vector<SUMaterialRef> materials(num_materials);
+            SUModelGetMaterials(model_, num_materials, &materials[0], &num_materials);
+            for (auto m : materials) {
+                meta["materials"].push_back(GetMaterialName(m));
+            }
+        }
+        
+        // Layers list
+        if (num_layers > 0) {
+            std::vector<SULayerRef> layers(num_layers);
+            SUModelGetLayers(model_, num_layers, &layers[0], &num_layers);
+            for (auto l : layers) {
+                meta["layers"].push_back(GetLayerName(l));
+            }
+        }
+        
+        SUModelRelease(&model_);
+        SUTerminate();
+        
+        meta["status"] = "success";
+    } catch (const std::exception& e) {
+        meta["error"] = e.what();
+        meta["status"] = "failed";
+    } catch (...) {
+        meta["error"] = "Unknown error";
+        meta["status"] = "failed";
+    }
+    
+    return meta.dump();
+}
+
+void CSkpExporter::LoadMaterialConfig(const std::string& config_path) {
+    try {
+        std::ifstream f(config_path);
+        if (f.is_open()) {
+            f >> material_config_;
+        } else {
+            // Default config if file missing
+            material_config_ = {
+                {"mappings", {
+                    {{"keywords", {"metal", "steel"}}, {"metallic", 1.0}, {"roughness", 0.2}},
+                    {{"keywords", {"glass"}}, {"metallic", 0.0}, {"roughness", 0.05}}
+                }},
+                {"defaults", {{"metallic", 0.0}, {"roughness", 0.6}}}
+            };
+        }
+    } catch (...) {
+        // Fallback to safe defaults
+        material_config_ = {{"defaults", {{"metallic", 0.0}, {"roughness", 0.6}}}};
+    }
+}
+
+void CSkpExporter::ApplyPbrMapping(const std::string& mat_name, float& metallic, float& roughness) {
+    if (material_config_.is_null() || !material_config_.contains("defaults")) {
+        metallic = 0.0f;
+        roughness = 0.6f;
+        return;
+    }
+    
+    metallic = material_config_["defaults"]["metallic"];
+    roughness = material_config_["defaults"]["roughness"];
+    
+    std::string lowerName = ToLowerCopy(mat_name);
+    
+    if (material_config_.contains("mappings")) {
+        for (auto& mapping : material_config_["mappings"]) {
+            if (mapping.contains("keywords")) {
+                for (auto& keyword : mapping["keywords"]) {
+                    if (lowerName.find(ToLowerCopy(keyword)) != std::string::npos) {
+                        metallic = mapping["metallic"];
+                        roughness = mapping["roughness"];
+                        return;
+                    }
+                }
+            }
+        }
+    }
 }

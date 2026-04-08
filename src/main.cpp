@@ -153,6 +153,21 @@ int main(int argc, char **argv)
     }
 
     std::cout << "Start conversion" << std::endl;
+    
+    // Check for metadata only mode
+    bool is_metadata_mode = false;
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "--metadata") {
+            is_metadata_mode = true;
+            break;
+        }
+    }
+
+    if (is_metadata_mode) {
+        std::cout << cSkpExporter.GetMetadataJson(skp_file) << std::endl;
+        return 0;
+    }
+
     if (use_draco) {
         std::cout << "Draco settings: speed=" << cSkpExporter.options().draco_speed()
                   << ", pos=" << cSkpExporter.options().draco_position_bits()
