@@ -20,6 +20,7 @@
 #include <map>
 #include <string>
 #include <functional>
+#include <nlohmann/json.hpp>
 
 #include <SketchUpAPI/import_export/pluginprogresscallback.h>
 #include <SketchUpAPI/model/defs.h>
