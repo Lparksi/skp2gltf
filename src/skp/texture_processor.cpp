@@ -1,9 +1,11 @@
 #define STBI_NO_FAILURE_STRINGS
+#define STB_IMAGE_IMPLEMENTATION
 #include "tinygltf/stb_image.h"
 
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "tinygltf/stb_image_resize2.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "tinygltf/stb_image_write.h"
 
 #include "texture_processor.h"
