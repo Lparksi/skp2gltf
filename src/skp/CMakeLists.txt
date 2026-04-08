@@ -9,4 +9,5 @@ target_include_directories(skp2native PRIVATE
 
 target_link_libraries(skp2native PRIVATE
     gltflib
+    meshoptimizer
 )
