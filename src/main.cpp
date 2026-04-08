@@ -8,9 +8,6 @@
  * @Last Modified time: 2025-02-18 17:26:05 
  */
 
-#define TINYGLTF_IMPLEMENTATION
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <SketchUpAPI/sketchup.h>
 
 #include <memory>
